@@ -1,0 +1,17 @@
+#PBS -S /bin/bash
+#PBS -N RB_MHD_scaling
+#PBS -l select=1639:ncpus=20:mpiprocs=20:model=ivy
+#PBS -l walltime=00:30:00
+#PBS -j oe
+#PBS -q normal
+
+cd $PBS_O_WORKDIR
+
+source /home5/bpbrown/dedalus/bin/activate
+
+date
+python3 scaling.py run RB_3d.py 512 --3D --MPISGI --verbose --max-cores=32768 --min-cores=4096
+python3 scaling.py run RB_3d.py 256 --3D --MPISGI --verbose --max-cores=32768 --min-cores=2048
+python3 scaling.py run RB_3d.py 128 --3D --MPISGI --verbose --max-cores=32768
+python3 scaling.py run RB_3d.py 64  --3D --MPISGI --verbose --max-cores=32768
+date
