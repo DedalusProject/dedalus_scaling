@@ -21,6 +21,8 @@ Options:
     --aspect=<aspect>         Aspect ratio [default: 2]
     --Rayleigh=<Rayleigh>     Rayleigh number of the convection [default: 1e6]
 
+    --niter=<niter>           Iterations to run scaling test for (+1 automatically added to account for startup) [default: 100]
+
     --mesh=<mesh>             Processor mesh if distributing in 2-D
 
 """
@@ -71,8 +73,6 @@ x_basis = de.Fourier(  'x', nx, interval=(0, Lx), dealias=3/2)
 y_basis = de.Fourier(  'y', ny, interval=(0, Ly), dealias=3/2)
 z_basis = de.Chebyshev('z', nz, interval=(0, Lz), dealias=3/2)
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64, mesh=mesh)
-#mesh=[16,16] : roughly 0.8333 iter/sec [averaged over 100 iter]
-#mesh=[32,32] : roughly 1.6666 iter/sec [averaged over 100 iter]  (2x speedup vs 4x expected)
 
 # 3D Boussinesq magnetohydrodynamics with vector potential formulism
 problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w'])
@@ -139,10 +139,11 @@ T.set_scales(1, keep_data=True)
 # Initial timestep
 dt = 1e-3 #0.125
 
+niter = int(float(args['--niter']))+1
 # Integration parameters
 solver.stop_sim_time = 50
 solver.stop_wall_time = 30 * 60.
-solver.stop_iteration = 10+1 #100
+solver.stop_iteration = niter
 
 max_dt = 0.5
 # CFL
