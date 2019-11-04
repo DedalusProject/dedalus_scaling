@@ -12,15 +12,17 @@ with dy() in them.
 This version of the script is intended for scaling and performance tests.
 
 Usage:
-    rayleigh_benard_mhd_A_2.5d_scaling.py [options] 
+    rayleigh_benard_mhd_A_2.5d_scaling.py [options]
 
 Options:
     --nz=<nz>                 Number of Chebyshev modes [default: 128]
     --nx=<nx>                 Number of Fourier modes; default is aspect*nz
     --ny=<ny>                 Number of Fourier modes; default is aspect*nz
+    --niter=<niter>           Iterations to run scaling test for (+1 automatically added to account for startup) [default: 10]
+
     --aspect=<aspect>         Aspect ratio [default: 2]
     --Rayleigh=<Rayleigh>     Rayleigh number of the convection [default: 1e6]
-    
+
     --mesh=<mesh>             Processor mesh if distributing in 2-D
 
 """
@@ -51,6 +53,11 @@ if ny is None:
     ny = nz*aspect
 else:
     ny = int(ny)
+
+startup_iter = 5
+niter = int(float(args['--niter']))+startup_iter
+
+
 Rayleigh_string = args['--Rayleigh']
 Rayleigh = float(Rayleigh_string)
 
@@ -58,21 +65,17 @@ mesh = args['--mesh']
 if mesh is not None:
     mesh = mesh.split(',')
     mesh = [int(mesh[0]), int(mesh[1])]
-    
+
 # Parameters
-#aspect = 4.
 Lx, Ly, Lz = (aspect, aspect, 1.)
 Prandtl = 1.
 MagneticPrandtl = 1.
-#Rayleigh = 1e6
 
 # Create bases and domain
 x_basis = de.Fourier(  'x', nx, interval=(0, Lx), dealias=3/2)
 y_basis = de.Fourier(  'y', ny, interval=(0, Ly), dealias=3/2)
 z_basis = de.Chebyshev('z', nz, interval=(0, Lz), dealias=3/2)
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64, mesh=mesh)
-#mesh=[16,16] : roughly 0.8333 iter/sec [averaged over 100 iter]
-#mesh=[32,32] : roughly 1.6666 iter/sec [averaged over 100 iter]  (2x speedup vs 4x expected)
 
 # 3D Boussinesq magnetohydrodynamics with vector potential formulism
 problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w','phi','Ax','Ay','Az','Bx','By'])
@@ -152,7 +155,6 @@ noise = rand.standard_normal(gshape)[slices]
 zb, zt = z_basis.interval
 pert =  1e-3 * noise * (zt - z) * (z - zb)
 T['g'] = F * pert
-# poor (or rich?) man's coeff filter.
 # if you set to scales(1), see obvious divU error early on; at 1/2 or 1/4, no divU error
 T.set_scales(1/4, keep_data=True)
 T['c']
@@ -161,20 +163,16 @@ T.set_scales(1, keep_data=True)
 
 
 B0 = 1e-6
-#Bx['g'] = B0*np.cos(np.pi*z/Lz)
-#Bx.antidifferentiate('z',('left',0), out=Ay)
-#Ay['g'] *= -1
-
 Ay['g'] =  B0*np.sin(np.pi*z/Lz)
 Bx['g'] = (-1*np.pi/Lz)*B0*np.cos(np.pi*z/Lz)
 
 # Initial timestep
-dt = 1e-3 #0.125
+dt = 1e-3
 
 # Integration parameters
 solver.stop_sim_time = 50
 solver.stop_wall_time = 30 * 60.
-solver.stop_iteration = 10+1 #100
+solver.stop_iteration = niter
 
 max_dt = 0.5
 # CFL
@@ -197,15 +195,13 @@ def sheet_of_B(z, sheet_center=0.5, sheet_width=0.1, **kwargs):
 # Main
 try:
     logger.info('Starting loop')
-    first_loop = True
     while solver.ok:
         dt = CFL.compute_dt()
         dt = solver.step(dt) #, trim=True)
         log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
         logger.info(log_string)
-        if first_loop:
+        if iter == startup_iter:
             start_time = time.time()
-            first_loop = False
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
@@ -224,7 +220,7 @@ finally:
         total_time = end_time-initial_time
         main_loop_time = end_time - start_time
         startup_time = start_time-initial_time
-        n_steps = solver.iteration-1
+        n_steps = solver.iteration-startup_iter
         print('  startup time:', startup_time)
         print('main loop time:', main_loop_time)
         print('    total time:', total_time)
@@ -235,8 +231,8 @@ finally:
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
               ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
-                                                                main_loop_time, 
-                                                                main_loop_time/n_steps, 
-                                                                main_loop_time/n_steps/(nx*nz), 
+                                                                main_loop_time,
+                                                                main_loop_time/n_steps,
+                                                                main_loop_time/n_steps/(nx*nz),
                                                                 N_TOTAL_CPU*main_loop_time/n_steps/(nx*nz)))
         print('-' * 40)
