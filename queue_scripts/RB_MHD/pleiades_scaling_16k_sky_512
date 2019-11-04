@@ -1,0 +1,14 @@
+#PBS -S /bin/bash
+#PBS -N RB_MHD_scaling
+#PBS -l select=410:ncpus=40:mpiprocs=40:model=sky_ele
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -q normal
+
+cd $PBS_O_WORKDIR
+
+source ~/dedalus/bin/activate
+
+date
+python3 scaling.py run RB_mhd_3d.py 512 --3D --MPISGI --verbose --max-cores=16384 --min-cores=128 --niter=10
+date

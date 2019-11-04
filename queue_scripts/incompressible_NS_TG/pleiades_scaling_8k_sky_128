@@ -9,8 +9,6 @@ cd $PBS_O_WORKDIR
 
 source /home5/bpbrown/dedalus/bin/activate
 
-export dedalus_script=incompressible_NS_TG.py
-
 date
-python3 scaling.py run $dedalus_script 128 --3D --MPISGI --verbose --max-cores=8192 --min-cores=4 --niter=80
+python3 scaling.py run incompressible_NS_TG.py 128 --3D --MPISGI --verbose --max-cores=8192 --min-cores=4 --niter=80
 date
