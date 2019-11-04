@@ -14,8 +14,6 @@ Options:
     --ny=<ny>                 Fourier resolution [default: 128]
     --niter=<niter>           Iterations to run scaling test for (+1 automatically added to account for startup) [default: 100]
     --IO                      Do analysis IO
-
-    --verbose                 Make sparsity plots
     
 """
 from docopt import docopt
@@ -30,8 +28,6 @@ from dedalus.extras import flow_tools
 
 import logging
 logger = logging.getLogger(__name__)
-
-verbose = args['--verbose']
 
 niter = int(float(args['--niter']))+1
 
@@ -121,34 +117,7 @@ try:
         dt = solver.step(dt)
         if (solver.iteration-1) % 1 == 0:
             logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
-            
         if first_loop:
-            if verbose:
-                data_dir='./'
-                import matplotlib
-                matplotlib.use('Agg')
-                import matplotlib.pyplot as plt
-                fig = plt.figure()
-                ax = fig.add_subplot(1,1,1)
-                ax.spy(solver.pencils[0].L, markersize=1, markeredgewidth=0.0)
-                fig.savefig(data_dir+"sparsity_pattern.png", dpi=1200)
-
-                import scipy.sparse.linalg as sla
-                perm_spec_set = ['NATURAL', 'COLAMD', 'MMD_ATA', 'MMD_AT_plus_A']
-                for perm_spec in perm_spec_set:
-                    LU = sla.splu(solver.pencils[0].LHS.tocsc(), permc_spec=perm_spec)
-                    fig = plt.figure()
-                    ax = fig.add_subplot(1,2,1)
-                    ax.spy(LU.L.A, markersize=1, markeredgewidth=0.0)
-                    ax = fig.add_subplot(1,2,2)
-                    ax.spy(LU.U.A, markersize=1, markeredgewidth=0.0)
-                    fig.savefig(data_dir+"sparsity_pattern_LU_{}.png".format(perm_spec), dpi=1200)
-
-                    logger.info("------- {} -------".format(perm_spec))
-                    logger.info("{} nonzero entries in LU".format(LU.nnz))
-                    logger.info("{} nonzero entries in LHS".format(solver.pencils[0].LHS.tocsc().nnz))
-                    logger.info("{} fill in factor".format(LU.nnz/solver.pencils[0].LHS.tocsc().nnz))
-            
             start_time = time.time()
             first_loop = False
             
