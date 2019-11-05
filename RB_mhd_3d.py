@@ -182,22 +182,12 @@ CFL.add_velocities(('u', 'v', 'w'))
 CFL.add_velocities(('Bx', 'By', 'Bz'))
 
 
-Tobias_gambit = True
-Did_gambit = False
-import scipy.special as scp
-
-def sheet_of_B(z, sheet_center=0.5, sheet_width=0.1, **kwargs):
-    def match_Phi(z, f=scp.erf, center=0.5, width=0.025):
-        return 1/2*(1-f((z-center)/width))
-
-    return (1-match_Phi(z, center=sheet_center-sheet_width/2, **kwargs))*(match_Phi(z, center=sheet_center+sheet_width/2, **kwargs))
-
 # Main
 try:
     logger.info('Starting loop')
     while solver.ok:
         dt = CFL.compute_dt()
-        dt = solver.step(dt) #, trim=True)
+        dt = solver.step(dt)
         log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
         logger.info(log_string)
         if solver.iteration == startup_iter:
@@ -227,12 +217,11 @@ finally:
         print('    iterations:', solver.iteration)
         print(' loop sec/iter:', main_loop_time/solver.iteration)
         print('    average dt:', solver.sim_time / n_steps)
-        print("          N_cores, Nx, Nz, startup     main loop,   main loop/iter, main loop/iter/grid, n_cores*main loop/iter/grid")
+        print("          N_cores, Nx, Nz, startup     main loop,   main loop/iter, DOF-cycles/cpu-second")
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
               ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
                                                                 main_loop_time,
                                                                 main_loop_time/n_steps,
-                                                                main_loop_time/n_steps/(nx*nz),
-                                                                N_TOTAL_CPU*main_loop_time/n_steps/(nx*nz)))
+                                                                nx*ny*nz*n_steps/(N_TOTAL_CPU*main_loop_time))
         print('-' * 40)

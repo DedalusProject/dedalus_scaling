@@ -5,7 +5,7 @@ This script uses a Fourier basis in the x and z directions with periodic boundar
 conditions.
 
 Usage:
-    incompressible_NS_TG.py [options] 
+    incompressible_NS_TG.py [options]
 
 Options:
     --mesh=<mesh>             Processor mesh if distributing in 2-D
@@ -14,7 +14,7 @@ Options:
     --ny=<ny>                 Fourier resolution [default: 128]
     --niter=<niter>           Iterations to run scaling test for (+1 automatically added to account for startup) [default: 100]
     --IO                      Do analysis IO
-    
+
 """
 from docopt import docopt
 args = docopt(__doc__)
@@ -29,16 +29,17 @@ from dedalus.extras import flow_tools
 import logging
 logger = logging.getLogger(__name__)
 
-niter = int(float(args['--niter']))+1
+startup_iter = 5
+niter = int(float(args['--niter']))+startup_iter
 
 mesh = args['--mesh']
 if mesh is not None:
     mesh = mesh.split(',')
     mesh = [int(mesh[0]), int(mesh[1])]
 
-initial_time = time.time() 
+initial_time = time.time()
 # Parameters
-Lx, Ly, Lz = (1., 1., 1.)     
+Lx, Ly, Lz = (1., 1., 1.)
 nx, ny, nz = (int(args['--nx']),int(args['--ny']),int(args['--nz'])) # grid resolution is 3/2 higher
 
 Reynolds = 1
@@ -115,21 +116,18 @@ try:
     while solver.ok:
         dt = CFL.compute_dt()
         dt = solver.step(dt)
-        if (solver.iteration-1) % 1 == 0:
-            logger.info('Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt))
-        if first_loop:
+        log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
+        logger.info(log_string)
+        if solver.iteration == startup_iter:
             start_time = time.time()
-            first_loop = False
-            
-    N_iterations = solver.iteration - 1
-    
+
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
 finally:
     end_time = time.time()
-    logger.info('Iterations: {}'.format(N_iterations))
-    logger.info('seconds/iteration: {}'.format((end_time-start_time)/N_iterations))
+    logger.info('Iterations: {}'.format(solver.iteration-startup_iter))
+    logger.info('seconds/iteration: {}'.format((end_time-start_time)/solver.iteration-startup_iter))
     logger.info('Sim end time: {}'.format(solver.sim_time))
     logger.info('Run time: %.2f sec' %(end_time-start_time))
     logger.info('Run time: {} cpu-hr'.format((end_time-start_time)/60/60*domain.dist.comm_cart.size))
@@ -140,20 +138,18 @@ finally:
         total_time = end_time-initial_time
         main_loop_time = end_time - start_time
         startup_time = start_time-initial_time
-        n_steps = solver.iteration-1
+        n_steps = solver.iteration-startup_iter
         print('  startup time:', startup_time)
         print('main loop time:', main_loop_time)
         print('    total time:', total_time)
         print('    iterations:', solver.iteration)
         print(' loop sec/iter:', main_loop_time/solver.iteration)
         print('    average dt:', solver.sim_time / n_steps)
-        print("          N_cores, Nx, Nz, startup     main loop,   main loop/iter, main loop/iter/grid, n_cores*main loop/iter/grid")
+        print("          N_cores, Nx, Nz, startup     main loop,   main loop/iter, DOF-cycles/cpu-second")
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
               ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
-                                                                main_loop_time, 
-                                                                main_loop_time/n_steps, 
-                                                                main_loop_time/n_steps/(nx*nz), 
-                                                                N_TOTAL_CPU*main_loop_time/n_steps/(nx*nz)))
+                                                                main_loop_time,
+                                                                main_loop_time/n_steps,
+                                                                nx*ny*nz*n_steps/(N_TOTAL_CPU*main_loop_time))
         print('-' * 40)
-
