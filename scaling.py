@@ -130,8 +130,9 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
         file_name = file_name+'_'+label
     file_name = file_name+'.h5'
     print("writing file {}".format(file_name))
-    scaling_data = h5py.File(file_name, 'a')
-    scaling_data['script'] = scaling_script
+    scaling_file = h5py.File(file_name, 'w')
+    scaling_file['script'] = scaling_script
+    scaling_data = scaling_file.create_group('data')
 
     start_time = time.time()
 
@@ -237,7 +238,7 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
 #        if not label is None:
 #            data_set['plot_label'] = data_set['plot_label'] + "-" + label
 
-    scaling_data.close()
+    scaling_file.close()
 
     end_time = time.time()
     print(40*'*')
@@ -246,8 +247,22 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
 
 def read_scaling_run(file):
     print("opening file {}".format(file))
-    scaling_file = h5py.File(file, flag='r')
-    data_set = scaling_file['data']
+    scaling_file = h5py.File(file, 'r')
+    data = {}
+    data_set = {}
+    for case in scaling_file['data']:
+        data[case] = {}
+        for item in scaling_file['data'][case]:
+            data[case][item] =  scaling_file['data'][case][item][()]
+
+    for item in next(iter(data.values())):
+        data_set[item] = []
+    for case in data:
+        for item in data[case]:
+            data_set[item].append(data[case][item])
+    for item in data_set:
+        data_set[item] = np.array(data_set[item])
+    print(data_set)
     scaling_file.close()
     return data_set
 
@@ -265,9 +280,10 @@ def plot_scaling_run(data_set, ax_set,
     N_z = data_set['N_z']
     if dim is None:
         if 'dim' in data_set:
-            dim = data_set['dim']
+            dim = int(data_set['dim'][0])
         else:
             dim = 2
+        print(dim)
     if dim==3:
         sim_ny = data_set['sim_ny']
         N_y = data_set['N_y']
@@ -293,19 +309,19 @@ def plot_scaling_run(data_set, ax_set,
         color=next(ax_set[0]._get_lines.prop_cycler)['color']
 
     scale_to_factor = np.prod(np.array(scale_to_resolution))/np.prod(np.array(resolution))
-    scale_factor_inverse = np.int(np.rint((1./scale_to_factor)**(1/dim)))
+    scale_factor_inverse = np.int(np.rint((1./scale_to_factor)**(1./dim)))
 
     if clean_plot:
-        plot_label = data_set['plot_label'].split('-')[0]
+        plot_label = data_set['plot_label'][0].split('-')[0]
     else:
-        plot_label = data_set['plot_label']
+        plot_label = data_set['plot_label'][0]
 
     if explicit_label:
         label_string = plot_label
         scaled_label_string = plot_label + r'$/{:d}^{:d}$'.format(scale_factor_inverse, dim)
     else:
-        label_string = data_set['plot_label_short']
-        scaled_label_string = data_set['plot_label_short'] + r'$/{:d}^{:d}$'.format(scale_factor_inverse, dim)
+        label_string = data_set['plot_label_short'][0]
+        scaled_label_string = data_set['plot_label_short'][0] + r'$/{:d}^{:d}$'.format(scale_factor_inverse, dim)
 
     if ideal_curves:
         ideal_cores = np.sort(N_total_cpu)
@@ -554,6 +570,7 @@ if __name__ == "__main__":
         for file in args['<files>']:
             data_set = read_scaling_run(file)
             plot_scaling_run(data_set, ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
-        script = data_set['script']
 
+        #script = data_set['script']
+        script = ""
     finalize_plots(fig_set, ax_set, script)
