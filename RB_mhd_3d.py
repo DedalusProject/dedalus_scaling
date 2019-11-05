@@ -200,7 +200,7 @@ try:
         dt = solver.step(dt) #, trim=True)
         log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
         logger.info(log_string)
-        if iter == startup_iter:
+        if solver.iteration == startup_iter:
             start_time = time.time()
 except:
     logger.error('Exception raised, triggering end of main loop.')
