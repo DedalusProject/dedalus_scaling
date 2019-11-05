@@ -54,10 +54,6 @@ if ny is None:
 else:
     ny = int(ny)
 
-startup_iter = 5
-niter = int(float(args['--niter']))+startup_iter
-
-
 Rayleigh_string = args['--Rayleigh']
 Rayleigh = float(Rayleigh_string)
 
@@ -170,6 +166,9 @@ Bx['g'] = (-1*np.pi/Lz)*B0*np.cos(np.pi*z/Lz)
 dt = 1e-3
 
 # Integration parameters
+startup_iter = 5
+niter = int(float(args['--niter']))+startup_iter
+
 solver.stop_sim_time = 50
 solver.stop_wall_time = 30 * 60.
 solver.stop_iteration = niter
@@ -197,10 +196,6 @@ except:
     raise
 finally:
     end_time = time.time()
-    logger.info('Iterations: %i' %solver.iteration)
-    logger.info('Sim end time: %f' %solver.sim_time)
-    logger.info('Run time: %.2f sec' %(end_time-start_time))
-    logger.info('Run time: %f cpu-hr' %((end_time-start_time)/60/60*domain.dist.comm_cart.size))
 
     if (domain.distributor.rank==0):
         N_TOTAL_CPU = domain.distributor.comm_cart.size
@@ -214,10 +209,10 @@ finally:
         print('  startup time:', startup_time)
         print('main loop time:', main_loop_time)
         print('    total time:', total_time)
-        print('    iterations:', solver.iteration)
-        print(' loop sec/iter:', main_loop_time/solver.iteration)
-        print('    average dt:', solver.sim_time / n_steps)
-        print("          N_cores, Nx, Nz, startup     main loop,   main loop/iter, DOF-cycles/cpu-second")
+        print('    iterations:', n_steps)
+        print(' loop sec/iter:', main_loop_time/n_steps)
+        print('    average dt:', solver.sim_time/n_steps)
+        print("          N_cores, Nx, Nz, startup,    main loop,   main loop/iter, DOF-cycles/cpu-second")
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
               ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
