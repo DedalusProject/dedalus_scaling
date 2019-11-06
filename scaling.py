@@ -436,7 +436,7 @@ def add_base10_axis(ax):
     return ax10
     #######################################################
 
-def finalize_plots(fig_set, ax_set, script):
+def finalize_plots(fig_set, ax_set):
 
     ax_set[0].set_xlabel('N-core')
     ax_set[0].set_ylabel('total time [s]')
@@ -572,6 +572,4 @@ if __name__ == "__main__":
             data_set = read_scaling_run(file)
             plot_scaling_run(data_set, ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
 
-        #script = data_set['script']
-        script = ""
-    finalize_plots(fig_set, ax_set, script)
+        finalize_plots(fig_set, ax_set)
