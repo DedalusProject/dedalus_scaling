@@ -124,116 +124,122 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
         res_string = '{:d}x{:d}'.format(sim_nx, sim_nz)
 
     # create scaling data file
-    file_label = res_string
+    file_label = scaling_script.split('.py')[0]
     file_name = 'scaling_data_'+file_label
     if not label is None:
         file_name = file_name+'_'+label
     file_name = file_name+'.h5'
     print("writing file {}".format(file_name))
-    scaling_file = h5py.File(file_name, 'w')
-    scaling_file['script'] = scaling_script
-    scaling_data = scaling_file.create_group('data')
+    scaling_file = h5py.File(file_name, 'a')
+    if 'details' not in scaling_file:
+        scaling_file['details/script'] = scaling_script
+    res_group = 'data/'+res_string
+    scaling_data = scaling_file.require_group(res_group)
 
     start_time = time.time()
 
     for CPUs in scaling_test_set:
         if dim == 3:
             ENV_N_TOTAL_CPU = np.prod(CPUs)
-            label = '{:d}x{:d}'.format(CPUs[0],CPUs[1])
-            print(CPUs)
+            cpu_group = '{:d}x{:d}'.format(CPUs[0],CPUs[1])
         else:
             ENV_N_TOTAL_CPU = CPUs
-            label = '{:d}'.format(CPUs[0])
+            cpu_group = '{:d}'.format(CPUs[0])
 
         print("scaling test of {}".format(scaling_script),
               " at {:s}".format(res_string),
               " on {:d} cores".format(ENV_N_TOTAL_CPU))
 
-        test_env = dict(os.environ,
-                        N_X='{:d}'.format(sim_nx),
-                        N_Z='{:d}'.format(sim_nz),
-                        N_TOTAL_CPU='{:d}'.format(ENV_N_TOTAL_CPU))
-        if OpenMPI:
-            commands = ["mpirun", "-n","{:d}".format(ENV_N_TOTAL_CPU),
-                        "--bind-to", "core", "--map-by", "core"]
-        elif MPISGI:
-            commands = ['mpiexec_mpt', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
-        elif IntelMPI:
-             commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
-        else:
-             commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+        if not cpu_group in scaling_data:
+            print('testing cpu set: {:}'.format(cpu_group))
 
-        commands += ["python3", scaling_script, "--nz={:d}".format(sim_nz), "--nx={:d}".format(sim_nx)]
-        if dim == 3:
-            commands.append("--mesh={:d},{:d}".format(CPUs[0], CPUs[1]))
-            commands.append("--ny={:d}".format(sim_ny))
-            print(" pencils/core (0): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], sim_ny/CPUs[1], 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])))
-            print(" pencils/core (2): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], 3/2*sim_nz/CPUs[1], 1/2*sim_nx*3/2*sim_nz/(CPUs[0]*CPUs[1])))
-            print(" pencils/core (4): {:g}x{:g}={:g}".format(3/2*sim_ny/CPUs[0], 3/2*sim_nz/CPUs[1], 3/2*sim_ny*3/2*sim_nz/(CPUs[0]*CPUs[1])))
-            min_pencils_per_core = 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])
-        else:
-            print(" pencils/core: {:g} ({:g}) and {:g} ({:g})".format(1/2*sim_nx/ENV_N_TOTAL_CPU, 3/2*sim_nx/ENV_N_TOTAL_CPU,
-                                                                          sim_nz/ENV_N_TOTAL_CPU, 3/2*sim_nz/ENV_N_TOTAL_CPU))
-            min_pencils_per_core = min(1/2*sim_nx/ENV_N_TOTAL_CPU, sim_nz/ENV_N_TOTAL_CPU)
-        if niter is not None:
-            commands += ["--niter={:d}".format(niter)]
+            test_env = dict(os.environ,
+                            N_X='{:d}'.format(sim_nx),
+                            N_Z='{:d}'.format(sim_nz),
+                            N_TOTAL_CPU='{:d}'.format(ENV_N_TOTAL_CPU))
+            if OpenMPI:
+                commands = ["mpirun", "-n","{:d}".format(ENV_N_TOTAL_CPU),
+                            "--bind-to", "core", "--map-by", "core"]
+            elif MPISGI:
+                commands = ['mpiexec_mpt', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+            elif IntelMPI:
+                 commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+            else:
+                 commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
 
-        print("command: "+" ".join(commands))
-        proc = subprocess.run(commands,
-                              env=test_env,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        stdout, stderr = proc.stdout, proc.stderr
+            commands += ["python3", scaling_script, "--nz={:d}".format(sim_nz), "--nx={:d}".format(sim_nx)]
+            if dim == 3:
+                commands.append("--mesh={:d},{:d}".format(CPUs[0], CPUs[1]))
+                commands.append("--ny={:d}".format(sim_ny))
+                print(" pencils/core (0): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], sim_ny/CPUs[1], 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])))
+                print(" pencils/core (2): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], 3/2*sim_nz/CPUs[1], 1/2*sim_nx*3/2*sim_nz/(CPUs[0]*CPUs[1])))
+                print(" pencils/core (4): {:g}x{:g}={:g}".format(3/2*sim_ny/CPUs[0], 3/2*sim_nz/CPUs[1], 3/2*sim_ny*3/2*sim_nz/(CPUs[0]*CPUs[1])))
+                min_pencils_per_core = 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])
+            else:
+                print(" pencils/core: {:g} ({:g}) and {:g} ({:g})".format(1/2*sim_nx/ENV_N_TOTAL_CPU, 3/2*sim_nx/ENV_N_TOTAL_CPU,
+                                                                              sim_nz/ENV_N_TOTAL_CPU, 3/2*sim_nz/ENV_N_TOTAL_CPU))
+                min_pencils_per_core = min(1/2*sim_nx/ENV_N_TOTAL_CPU, sim_nz/ENV_N_TOTAL_CPU)
+            if niter is not None:
+                commands += ["--niter={:d}".format(niter)]
 
-        if verbose:
+            print("command: "+" ".join(commands))
+            proc = subprocess.run(commands,
+                                  env=test_env,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            stdout, stderr = proc.stdout, proc.stderr
+
+            if verbose:
+                for line in stdout.splitlines():
+                    print("out: {}".format(line))
+
+                for line in stderr.splitlines():
+                    print("err: {}".format(line))
+
             for line in stdout.splitlines():
-                print("out: {}".format(line))
+                if line.startswith('scaling:'):
+                    split_line = line.split()
+                    print(split_line)
+                    N_total_cpu=num(split_line[1])
 
-            for line in stderr.splitlines():
-                print("err: {}".format(line))
+                    N_x = num(split_line[2])
+                    N_z = num(split_line[3])
 
-        for line in stdout.splitlines():
-            if line.startswith('scaling:'):
-                split_line = line.split()
-                print(split_line)
-                N_total_cpu=num(split_line[1])
+                    startup_time = num(split_line[4])
+                    wall_time = num(split_line[5])
+                    wall_time_per_iter = num(split_line[6])
 
-                N_x = num(split_line[2])
-                N_z = num(split_line[3])
+                    DOF_cyles_per_cpusec = num(split_line[7])
+            data_set = scaling_data.create_group(cpu_group)
 
-                startup_time = num(split_line[4])
-                wall_time = num(split_line[5])
-                wall_time_per_iter = num(split_line[6])
+            data_set['N_total_cpu'] = N_total_cpu
+            data_set['min_pencils_per_core'] = min_pencils_per_core
 
-                DOF_cyles_per_cpusec = num(split_line[7])
-        data_set = scaling_data.create_group(label)
+            data_set['N_z'] = N_z
+            data_set['N_x'] = N_x
+            data_set['sim_nx'] = sim_nx
+            data_set['sim_nz'] = sim_nz
+            if dim == 3:
+                data_set['N_y'] = N_x
+                data_set['sim_ny'] = sim_ny
 
-        data_set['N_total_cpu'] = N_total_cpu
-        data_set['min_pencils_per_core'] = min_pencils_per_core
+            data_set['startup_time'] = startup_time
+            data_set['wall_time'] = wall_time
+            data_set['wall_time_per_iter'] = wall_time_per_iter
+            data_set['DOF_cyles_per_cpusec'] = DOF_cyles_per_cpusec
 
-        data_set['N_z'] = N_z
-        data_set['N_x'] = N_x
-        data_set['sim_nx'] = sim_nx
-        data_set['sim_nz'] = sim_nz
-        if dim == 3:
-            data_set['N_y'] = N_x
-            data_set['sim_ny'] = sim_ny
-
-        data_set['startup_time'] = startup_time
-        data_set['wall_time'] = wall_time
-        data_set['wall_time_per_iter'] = wall_time_per_iter
-        data_set['DOF_cyles_per_cpusec'] = DOF_cyles_per_cpusec
-
-        data_set['dim'] = dim
-        if dim == 3:
-            data_set['plot_label'] = r'${:d}\times{:d}\times{:d}$'.format(sim_nx, sim_ny, sim_nz)
-            data_set['plot_label_short'] = r'${:d}^3$'.format(sim_nz)
-            data_set['mesh'] = [CPUs[0], CPUs[1]]
-            data_set['N_x_cpu'] = CPUs[0]
-            data_set['N_y_cpu'] = CPUs[1]
+            data_set['dim'] = dim
+            if dim == 3:
+                data_set['plot_label'] = r'${:d}\times{:d}\times{:d}$'.format(sim_nx, sim_ny, sim_nz)
+                data_set['plot_label_short'] = r'${:d}^3$'.format(sim_nz)
+                data_set['mesh'] = [CPUs[0], CPUs[1]]
+                data_set['N_x_cpu'] = CPUs[0]
+                data_set['N_y_cpu'] = CPUs[1]
+            else:
+                data_set['plot_label'] = r'${:d}\times{:d}$'.format(sim_nx, sim_nz)
+                data_set['plot_label_short'] = r'${:d}^2$'.format(sim_nz)
+                data_set['mesh'] = None
         else:
-            data_set['plot_label'] = r'${:d}\times{:d}$'.format(sim_nx, sim_nz)
-            data_set['plot_label_short'] = r'${:d}^2$'.format(sim_nz)
-            data_set['mesh'] = None
+            print('cpu set {:} has already been tested; skipping.'.format(cpu_group))
 
 #        if not label is None:
 #            data_set['plot_label'] = data_set['plot_label'] + "-" + label
@@ -262,7 +268,7 @@ def read_scaling_run(file):
             data_set[item].append(data[case][item])
     for item in data_set:
         data_set[item] = np.array(data_set[item])
-    print(data_set)
+
     scaling_file.close()
     return data_set
 
@@ -373,7 +379,6 @@ def initialize_plots(num_figs, fontsize=12):
     fig_set = []
     ax_set = []
 
-    x_size = 3.5 # width of single column in inches
     x_size = 7 # width of single column in inches
     y_size = x_size/scpconst.golden
 
@@ -422,7 +427,7 @@ def add_base10_axis(ax):
 
     tick_locs = ax.xaxis.get_ticklocs()
     ax10.set_xscale('log', basex=2)
-    ax10.grid() # suppress gridlines
+    ax10.grid()
     #ax10.grid(b=False) # suppress gridlines
     ax10.set_xticks(tick_locs)
     ax10.set_xticklabels(["{:d}".format(int(V)) for V in tick_locs])
@@ -436,7 +441,7 @@ def finalize_plots(fig_set, ax_set, script):
     ax_set[0].set_xlabel('N-core')
     ax_set[0].set_ylabel('total time [s]')
     legend_with_ideal(ax_set[0], loc='lower left')
-    fig_set[0].savefig('scaling_time.pdf')
+    #fig_set[0].savefig('scaling_time.pdf')
 
     ax10 = add_base10_axis(ax_set[1])
     ax_set[1].set_xlabel('N-core')
