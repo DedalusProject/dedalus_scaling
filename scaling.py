@@ -170,11 +170,11 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
             print(" pencils/core (0): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], sim_ny/CPUs[1], 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])))
             print(" pencils/core (2): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], 3/2*sim_nz/CPUs[1], 1/2*sim_nx*3/2*sim_nz/(CPUs[0]*CPUs[1])))
             print(" pencils/core (4): {:g}x{:g}={:g}".format(3/2*sim_ny/CPUs[0], 3/2*sim_nz/CPUs[1], 3/2*sim_ny*3/2*sim_nz/(CPUs[0]*CPUs[1])))
-
+            min_pencils_per_core = 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])
         else:
             print(" pencils/core: {:g} ({:g}) and {:g} ({:g})".format(1/2*sim_nx/ENV_N_TOTAL_CPU, 3/2*sim_nx/ENV_N_TOTAL_CPU,
                                                                           sim_nz/ENV_N_TOTAL_CPU, 3/2*sim_nz/ENV_N_TOTAL_CPU))
-
+            min_pencils_per_core = min(1/2*sim_nx/ENV_N_TOTAL_CPU, sim_nz/ENV_N_TOTAL_CPU)
         if niter is not None:
             commands += ["--niter={:d}".format(niter)]
 
@@ -204,32 +204,32 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
                 wall_time = num(split_line[5])
                 wall_time_per_iter = num(split_line[6])
 
-                work = num(split_line[7])
-                work_per_core  = num(split_line[8])
+                DOF_cyles_per_cpusec = num(split_line[7])
         data_set = scaling_data.create_group(label)
 
         data_set['N_total_cpu'] = N_total_cpu
+        data_set['min_pencils_per_core'] = min_pencils_per_core
+
         data_set['N_z'] = N_z
         data_set['N_x'] = N_x
         data_set['sim_nx'] = sim_nx
         data_set['sim_nz'] = sim_nz
         if dim == 3:
-            data_set['sim_ny'] = sim_ny
             data_set['N_y'] = N_x
+            data_set['sim_ny'] = sim_ny
 
         data_set['startup_time'] = startup_time
         data_set['wall_time'] = wall_time
         data_set['wall_time_per_iter'] = wall_time_per_iter
-        data_set['work'] = work
-        data_set['work_per_core'] = work_per_core
+        data_set['DOF_cyles_per_cpusec'] = DOF_cyles_per_cpusec
+
         data_set['dim'] = dim
         if dim == 3:
             data_set['plot_label'] = r'${:d}\times{:d}\times{:d}$'.format(sim_nx, sim_ny, sim_nz)
             data_set['plot_label_short'] = r'${:d}^3$'.format(sim_nz)
-            mesh = [CPUs[0], CPUs[1]]
-            data_set['mesh'] = mesh
-            data_set['N_x_cpu'] = mesh[0]
-            data_set['N_y_cpu'] = mesh[1]
+            data_set['mesh'] = [CPUs[0], CPUs[1]]
+            data_set['N_x_cpu'] = CPUs[0]
+            data_set['N_y_cpu'] = CPUs[1]
         else:
             data_set['plot_label'] = r'${:d}\times{:d}$'.format(sim_nx, sim_nz)
             data_set['plot_label_short'] = r'${:d}^2$'.format(sim_nz)
@@ -276,6 +276,7 @@ def plot_scaling_run(data_set, ax_set,
     sim_nx = data_set['sim_nx']
     sim_nz = data_set['sim_nz']
     N_total_cpu = data_set['N_total_cpu']
+    min_pencils_per_core = data_set['min_pencils_per_core']
     N_x = data_set['N_x']
     N_z = data_set['N_z']
     if dim is None:
@@ -293,8 +294,7 @@ def plot_scaling_run(data_set, ax_set,
     startup_time = data_set['startup_time']
     wall_time = data_set['wall_time']
     wall_time_per_iter = data_set['wall_time_per_iter']
-    work = data_set['work']
-    work_per_core = data_set['work_per_core']
+    DOF_cyles_per_cpusec = data_set['DOF_cyles_per_cpusec']
 
     if dim == 2:
         resolution = [sim_nx, sim_nz]
@@ -344,7 +344,7 @@ def plot_scaling_run(data_set, ax_set,
     ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
 
-    ax_set[2].plot(N_total_cpu, work_per_core/1e-6, label=label_string,
+    ax_set[2].plot(N_total_cpu, DOF_cyles_per_cpusec, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
 
     ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
@@ -355,8 +355,9 @@ def plot_scaling_run(data_set, ax_set,
         ax_set[i].set_yscale('log')
         ax_set[i].margins(x=0.05, y=0.05)
 
-    i_max = N_total_cpu.argmax()
-    ax_set[4].plot(N_total_cpu[i_max], work_per_core[i_max]/1e-6, label=label_string,
+    #i_max = N_total_cpu.argmax()
+    i_max = min_pencils_per_core.argmin()
+    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], label=label_string +' ({:d}/core)'.format(int(min_pencils_per_core[i_max])),
                      marker=marker,  linestyle=linestyle, color=color)
 
     if scale_to and scale_to_factor != 1:
@@ -432,39 +433,34 @@ def add_base10_axis(ax):
 
 def finalize_plots(fig_set, ax_set, script):
 
-    ax_set[0].set_title('Wall time {}'.format(script))
     ax_set[0].set_xlabel('N-core')
     ax_set[0].set_ylabel('total time [s]')
     legend_with_ideal(ax_set[0], loc='lower left')
-    fig_set[0].savefig('scaling_time.png')
+    fig_set[0].savefig('scaling_time.pdf')
 
     ax10 = add_base10_axis(ax_set[1])
-    ax_set[1].set_title('Wall time per iteration {}'.format(script))
     ax_set[1].set_xlabel('N-core')
     ax_set[1].set_ylabel('time/iter [s]')
     legend_with_ideal(ax_set[1], loc='lower left')
     xlim = ax_set[1].get_xlim()
     ax_set[1].set_xlim(0.9*xlim[0],1.1*xlim[1])
     fig_set[1].subplots_adjust(bottom=0.2)
-    fig_set[1].savefig('scaling_time_per_iter.png', dpi=600)
+    fig_set[1].savefig('scaling_time_per_iter.pdf')
 
-    ax_set[2].set_title('Normalized work {}'.format(script))
     ax_set[2].set_xlabel('N-core')
-    ax_set[2].set_ylabel('N-cores * (time/iter/grid) [$\mu$s]')
+    ax_set[2].set_ylabel('DOF-cycles/cpu-sec')
     ax_set[2].legend(loc='upper left')
-    fig_set[2].savefig('scaling_work.png')
+    fig_set[2].savefig('scaling_DOF.pdf')
 
-    ax_set[3].set_title('startup time {}'.format(script))
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
     ax_set[3].legend(loc='lower right')
-    fig_set[3].savefig('scaling_startup.png')
+    fig_set[3].savefig('scaling_startup.pdf')
 
-    ax_set[4].set_title('Normalized work {}'.format(script))
     ax_set[4].set_xlabel('N-core')
-    ax_set[4].set_ylabel('N-cores * (time/iter/grid) [$\mu$s]')
+    ax_set[4].set_ylabel('DOF-cycles/cpu-sec')
     ax_set[4].legend(loc='upper left')
-    fig_set[4].savefig('scaling_work_strong.png')
+    fig_set[4].savefig('scaling_DOF_weak.pdf')
 
 
 
