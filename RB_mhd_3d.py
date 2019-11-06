@@ -215,8 +215,8 @@ finally:
         print("          N_cores, Nx, Nz, startup,    main loop,   main loop/iter, DOF-cycles/cpu-second")
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
-              ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
+              ' {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
                                                                 main_loop_time,
                                                                 main_loop_time/n_steps,
-                                                                nx*ny*nz*n_steps/(N_TOTAL_CPU*main_loop_time))
+                                                                nx*ny*nz*n_steps/(N_TOTAL_CPU*main_loop_time)))
         print('-' * 40)
