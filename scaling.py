@@ -443,8 +443,43 @@ def finalize_plots(fig_set, ax_set):
     fig_set[4].savefig('scaling_DOF_weak.pdf')
 
 
-def determine_test(CPU_set, mesh_dim=2, test_type='exhaustive',
+def determine_test(n_z, mesh_dim=2, test_type='exhaustive',
+                   one_pencil=None,
                    max_cores=None, min_cores=None):
+        if one_pencil:
+            print("Pushing to one pencil per core in coeff space; this may be inefficient depending on dealias padding choice.")
+            n_z_2 = np.log(n_z)/np.log(2)
+        else:
+            n_z_2 = np.log(n_z)/np.log(2)-1 # 2 pencils per core min
+
+        if max_cores is not None:
+            log2_max = np.log(max_cores)/np.log(2)
+            if mesh_dim == 2:
+                log2_max = log2_max/2
+            log2_max = np.floor(log2_max)
+            print("max cores in log2 space {:} (or {:})".format(log2_max, max_cores))
+            if n_z_2 > log2_max:
+                n_z_2 = log2_max
+
+        log_2_span = 3
+        n_z_2_min = n_z_2-log_2_span
+
+        if min_cores is not None:
+            min_cores = np.int(args['--min-cores'])
+            log2_min = np.log(min_cores)/np.log(2)
+            if mesh_dim == 2:
+                log2_min = log2_min/2
+            log2_min = np.ceil(log2_min)
+
+            print("min cores in log2 space {:} (or {:})".format(log2_min, min_cores))
+            n_z_2_min = log2_min
+
+        n_z_2 = np.floor(n_z_2)
+        n_z_2_min = np.ceil(n_z_2_min)
+
+        print("Spanning log-2 space from {} -- {}".format(n_z_2_min, n_z_2))
+        CPU_set = (2**np.arange(n_z_2_min, n_z_2+1)).astype(int)[::-1] # flip order so large numbers of cores are done first (and arange goes to -1 of top)
+
         if mesh_dim == 2:
             import itertools
             CPU_set_1 = CPU_set
@@ -458,8 +493,6 @@ def determine_test(CPU_set, mesh_dim=2, test_type='exhaustive',
                 if (np.min(CPU_set_1)*np.min(CPU_set_2)) > min_cores:
                     # append new element to end of set_1
                     CPU_set_1 = np.append(CPU_set_1, np.int(np.min(CPU_set_1)/2))
-            print(CPU_set_1)
-            print(CPU_set_2)
             print('testing from {:d} to {:d} cores'.format(np.min(CPU_set_1)*np.min(CPU_set_2),np.max(CPU_set_1)*np.max(CPU_set_2)))
             if test_type=='exhaustive':
                 print('doing exhaustive scaling test')
@@ -503,50 +536,21 @@ if __name__ == "__main__":
             resolution = [n_x, n_z]
             mesh_dim = 1
 
-        if args['--one-pencil']:
-            print("Pushing to one pencil per core in coeff space; this may be inefficient depending on dealias padding choice.")
-            n_z_2 = np.log(n_z)/np.log(2)
-        else:
-            n_z_2 = np.log(n_z)/np.log(2) -1 # 2 pencils per core min
-
         if args['--max-cores'] is not None:
             max_cores = np.int(args['--max-cores'])
-            log2_max = np.log(max_cores)/np.log(2)
-            if mesh_dim == 2:
-                log2_max = log2_max/2
-            log2_max = np.floor(log2_max)
-            print("max cores in log2 space {:} (or {:})".format(log2_max, max_cores))
-            if n_z_2 > log2_max:
-                n_z_2 = log2_max
         else:
             max_cores = None
-
-        log_2_span = 3
-        n_z_2_min = n_z_2-log_2_span
-
         if args['--min-cores'] is not None:
             min_cores = np.int(args['--min-cores'])
-            log2_min = np.log(min_cores)/np.log(2)
-            if mesh_dim == 2:
-                log2_min = log2_min/2
-            log2_min = np.ceil(log2_min)
-
-            print("min cores in log2 space {:} (or {:})".format(log2_min, min_cores))
-            n_z_2_min = log2_min
-
         else:
             min_cores = None
 
-        n_z_2 = np.floor(n_z_2)
-        n_z_2_min = np.ceil(n_z_2_min)
-
-        print("Spanning log-2 space from {} -- {}".format(n_z_2_min, n_z_2))
-        CPU_set = (2**np.arange(n_z_2_min, n_z_2+1)).astype(int)[::-1] # flip order so large numbers of cores are done first (and arange goes to -1 of top)
-        CPU_set = determine_test(CPU_set, mesh_dim=mesh_dim, max_cores=max_cores, min_cores=min_cores)
-        print("scaling run with {} on {} cores".format(resolution, CPU_set))
+        scaling_CPU_set = determine_test(n_z, one_pencil=args['--one-pencil'],
+                                 mesh_dim=mesh_dim, max_cores=max_cores, min_cores=min_cores)
+        print("scaling run with resolution: {}".format(resolution))
 
         start_time = time.time()
-        do_scaling_run(args['<scaling_script>'], resolution, CPU_set,
+        do_scaling_run(args['<scaling_script>'], resolution, scaling_CPU_set,
                                   niter=int(float(args['--niter'])), mesh_dim=mesh_dim,
                                   verbose=args['--verbose'], label=args['--label'],
                                   OpenMPI=args['--OpenMPI'], MPISGI=args['--MPISGI'], IntelMPI=args['--IntelMPI'])
