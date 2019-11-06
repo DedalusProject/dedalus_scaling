@@ -48,7 +48,7 @@ Options:
     --min-cores=<min-cores>      Min number of cores to use
 
     --output=<dir>         Output directory [default: ./scaling]
-    --rescale=<rescale>    rescale plots to particular Z resolution comparison case
+
     --clean_plot           Remove run-specific labels during plotting (e.g., for proposals or papers)
 
     --OpenMPI              Assume we're in an OpenMPI env; default if nothing else is selected
@@ -249,7 +249,7 @@ def read_scaling_run(file):
 
 # Plotting routines
 def plot_scaling_run(data_set, ax_set,
-                     ideal_curves = True, scale_to = False, scale_to_resolution=None,
+                     ideal_curves = True,
                      linestyle='solid', marker='o', color='None',
                      explicit_label = True, clean_plot=False,
                      dim=None):
@@ -279,18 +279,11 @@ def plot_scaling_run(data_set, ax_set,
 
     if dim == 2:
         resolution = [sim_nx, sim_nz]
-        if scale_to_resolution is None:
-            scale_to_resolution = [128,128]
     elif dim == 3 :
         resolution = [sim_nx, sim_ny, sim_nz]
-        if scale_to_resolution is None:
-            scale_to_resolution = [128,128,128]
 
     if color is 'None':
         color=next(ax_set[0]._get_lines.prop_cycler)['color']
-
-    scale_to_factor = np.prod(np.array(scale_to_resolution))/np.prod(np.array(resolution))
-    scale_factor_inverse = np.int(np.rint((1./scale_to_factor)**(1./dim)))
 
     if clean_plot:
         plot_label = data_set['plot_label'][0].split('-')[0]
@@ -299,10 +292,8 @@ def plot_scaling_run(data_set, ax_set,
 
     if explicit_label:
         label_string = plot_label
-        scaled_label_string = plot_label + r'$/{:d}^{:d}$'.format(scale_factor_inverse, dim)
     else:
         label_string = data_set['plot_label_short'][0]
-        scaled_label_string = data_set['plot_label_short'][0] + r'$/{:d}^{:d}$'.format(scale_factor_inverse, dim)
 
     if ideal_curves:
         ideal_cores = np.sort(N_total_cpu)
@@ -340,14 +331,6 @@ def plot_scaling_run(data_set, ax_set,
     i_max = min_pencils_per_core.argmin()
     ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], label=label_string +' ({:d}/core)'.format(int(min_pencils_per_core[i_max])),
                      marker=marker,  linestyle=linestyle, color=color)
-
-    if scale_to and scale_to_factor != 1:
-        print("scaling by {:f} or (1/{:d})^{:d}".format(scale_to_factor, scale_factor_inverse, dim))
-        ax_set[0].plot(N_total_cpu, wall_time*scale_to_factor, marker=marker,
-                         label=scaled_label_string, linestyle='--', color=color)
-
-        ax_set[1].plot(N_total_cpu, wall_time_per_iter*scale_to_factor, marker=marker,
-                         label=scaled_label_string, linestyle='--',color=color)
 
 def initialize_plots(num_figs, fontsize=12):
     import scipy.constants as scpconst
@@ -564,20 +547,12 @@ if __name__ == "__main__":
         output_path = pathlib.Path(args['--output']).absolute()
         if not output_path.exists():
             output_path.mkdir()
-        if not args['--rescale'] is None:
-            n_z_rescale = num(args['--rescale'])
-
-            scale_to_resolution = [2*n_z_rescale, n_z_rescale]
-            scale_to = True
-        else:
-            scale_to_resolution = [1, 1]
-            scale_to = False
 
         fig_set, ax_set = initialize_plots(5)
         for file in args['<files>']:
             data_set = read_scaling_run(file)
             for res in data_set:
                 print('plotting run: {:}'.format(res))
-                plot_scaling_run(data_set[res], ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
+                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'])
 
         finalize_plots(fig_set, ax_set)
