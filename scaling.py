@@ -254,23 +254,27 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
 def read_scaling_run(file):
     print("opening file {}".format(file))
     scaling_file = h5py.File(file, 'r')
-    data = {}
-    data_set = {}
-    for case in scaling_file['data']:
-        data[case] = {}
-        for item in scaling_file['data'][case]:
-            data[case][item] =  scaling_file['data'][case][item][()]
+    script_set = {}
+    for res in scaling_file['data']:
+        res_set = {}
+        data = {}
+        for cpus in scaling_file['data'][res]:
+            data[cpus] = {}
+            for item in scaling_file['data'][res][cpus]:
+                data[cpus][item] =  scaling_file['data'][res][cpus][item][()]
 
-    for item in next(iter(data.values())):
-        data_set[item] = []
-    for case in data:
-        for item in data[case]:
-            data_set[item].append(data[case][item])
-    for item in data_set:
-        data_set[item] = np.array(data_set[item])
+            for item in next(iter(data.values())):
+                res_set[item] = []
+            for cpus in data:
+                for item in data[cpus]:
+                    res_set[item].append(data[cpus][item])
+
+        for item in res_set:
+            res_set[item] = np.array(res_set[item])
+        script_set[res] = res_set
 
     scaling_file.close()
-    return data_set
+    return script_set
 
 # Plotting routines
 def plot_scaling_run(data_set, ax_set,
@@ -290,7 +294,7 @@ def plot_scaling_run(data_set, ax_set,
             dim = int(data_set['dim'][0])
         else:
             dim = 2
-        print(dim)
+
     if dim==3:
         sim_ny = data_set['sim_ny']
         N_y = data_set['N_y']
@@ -345,8 +349,8 @@ def plot_scaling_run(data_set, ax_set,
                    marker=marker, linestyle=linestyle, color=color)
 
     if dim == 3:
-        print("resetting linestyle")
         linestyle='None'
+
     ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
 
@@ -459,7 +463,7 @@ def finalize_plots(fig_set, ax_set):
 
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
-    ax_set[3].legend(loc='lower right')
+    ax_set[3].legend(loc='lower left')
     fig_set[3].savefig('scaling_startup.pdf')
 
     ax_set[4].set_xlabel('N-core')
@@ -547,9 +551,6 @@ if __name__ == "__main__":
                                   OpenMPI=args['--OpenMPI'], MPISGI=args['--MPISGI'], IntelMPI=args['--IntelMPI'])
         end_time = time.time()
 
-        #plot_scaling_run(data_set, ax_set)
-        script = args['<scaling_script>']
-
         print(40*'=')
         print('time to do all tests: {:f}'.format(end_time-start_time))
         print(40*'=')
@@ -570,6 +571,8 @@ if __name__ == "__main__":
         fig_set, ax_set = initialize_plots(5)
         for file in args['<files>']:
             data_set = read_scaling_run(file)
-            plot_scaling_run(data_set, ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
+            for res in data_set:
+                print('plotting run: {:}'.format(res))
+                plot_scaling_run(data_set[res], ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
 
         finalize_plots(fig_set, ax_set)
