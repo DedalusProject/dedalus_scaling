@@ -106,7 +106,6 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
         scaling_file['details/script'] = scaling_script
     res_group = 'data/'+res_string
     scaling_data = scaling_file.require_group(res_group)
-
     start_time = time.time()
 
     for CPUs in CPU_set:
@@ -123,6 +122,7 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
 
         if not cpu_group in scaling_data:
             print('testing cpu set: {:}'.format(cpu_group))
+            scaling_file.close()
 
             test_env = dict(os.environ,
                             N_X='{:d}'.format(sim_nx),
@@ -134,9 +134,9 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
             elif MPISGI:
                 commands = ['mpiexec_mpt', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
             elif IntelMPI:
-                 commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+                commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
             else:
-                 commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+                commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
 
             commands += ["python3", scaling_script, "--nz={:d}".format(sim_nz), "--nx={:d}".format(sim_nx)]
             if mesh_dim == 2:
@@ -180,6 +180,10 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
                     wall_time_per_iter = num(split_line[6])
 
                     DOF_cyles_per_cpusec = num(split_line[7])
+
+            scaling_file = h5py.File(file_name, 'a')
+            scaling_data = scaling_file.require_group(res_group)
+
             data_set = scaling_data.create_group(cpu_group)
 
             data_set['N_total_cpu'] = N_total_cpu
@@ -440,7 +444,6 @@ def determine_test(n_z, mesh_dim=2, test_type='exhaustive',
             if mesh_dim == 2:
                 log2_max = log2_max/2
             log2_max = np.floor(log2_max)
-            print("max cores in log2 space {:} (or {:})".format(log2_max, max_cores))
             if n_z_2 > log2_max:
                 n_z_2 = log2_max
 
@@ -454,13 +457,11 @@ def determine_test(n_z, mesh_dim=2, test_type='exhaustive',
                 log2_min = log2_min/2
             log2_min = np.ceil(log2_min)
 
-            print("min cores in log2 space {:} (or {:})".format(log2_min, min_cores))
             n_z_2_min = log2_min
 
         n_z_2 = np.floor(n_z_2)
         n_z_2_min = np.ceil(n_z_2_min)
 
-        print("Spanning log-2 space from {} -- {}".format(n_z_2_min, n_z_2))
         CPU_set = (2**np.arange(n_z_2_min, n_z_2+1)).astype(int)[::-1] # flip order so large numbers of cores are done first (and arange goes to -1 of top)
 
         if mesh_dim == 2:
