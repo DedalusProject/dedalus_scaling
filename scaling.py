@@ -476,7 +476,6 @@ if __name__ == "__main__":
 
     from docopt import docopt
 
-    fig_set, ax_set = initialize_plots(5)
     args = docopt(__doc__)
     if args['--3D']:
         dim = 3
@@ -568,6 +567,7 @@ if __name__ == "__main__":
             scale_to_resolution = [1, 1]
             scale_to = False
 
+        fig_set, ax_set = initialize_plots(5)
         for file in args['<files>']:
             data_set = read_scaling_run(file)
             plot_scaling_run(data_set, ax_set, scale_to=scale_to, scale_to_resolution=scale_to_resolution, clean_plot=args['--clean_plot'])
