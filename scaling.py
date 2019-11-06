@@ -549,9 +549,16 @@ if __name__ == "__main__":
             output_path.mkdir()
 
         fig_set, ax_set = initialize_plots(5)
+
+        import re
+        def natural_sort(l, reverse=False):
+            convert = lambda text: int(text) if text.isdigit() else text.lower()
+            alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+            return sorted(l, key = alphanum_key, reverse=reverse)
+
         for file in args['<files>']:
             data_set = read_scaling_run(file)
-            for res in data_set:
+            for res in natural_sort(data_set.keys(), reverse=True):
                 print('plotting run: {:}'.format(res))
                 plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'])
 
