@@ -33,7 +33,7 @@ Usage:
     scaling.py plot <files>... [options]
 
 Options:
-     <z_resolution>        set Z resolution in chebyshev direction; X and Y resolution is same.
+     <z_resolution>        set Z resolution in chebyshev direction; X and Y resolution is same. [default: 256]
     --label=<label>        Label for output file
     --niter=<niter>        Number of iterations to run for [default: 100]
     --verbose              Print verbose output at end of each run (stdout and stderr)
@@ -78,7 +78,7 @@ def num(s):
 
 def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_cores=None,
                    niter=None,
-                   test_type='exhaustive', verbose=None, label=None, dim=2,
+                   verbose=None, label=None, dim=2,
                    OpenMPI=None, MPISGI=None, IntelMPI=None):
     if OpenMPI is None and IntelMPI is None and MPISGI is None:
         OpenMPI = True
@@ -90,37 +90,8 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
             sim_ny = resolution[1]
         else:
             sim_ny = sim_nx
-
-    if dim == 3:
-        import itertools
-        CPU_set_1 = CPU_set
-        CPU_set_2 = CPU_set
-
-        if max_cores is not None:
-            if (np.max(CPU_set_1)**2) < max_cores:
-                # append new element to front of set_2
-                CPU_set_2 = np.append(2*np.max(CPU_set_2), CPU_set_2)
-        if min_cores is not None:
-            if (np.min(CPU_set_1)*np.min(CPU_set_2)) > min_cores:
-                # append new element to end of set_1
-                CPU_set_1 = np.append(CPU_set_1, np.int(np.min(CPU_set_1)/2))
-        print(CPU_set_1)
-        print(CPU_set_2)
-        print('testing from {:d} to {:d} cores'.format(np.min(CPU_set_1)*np.min(CPU_set_2),np.max(CPU_set_1)*np.max(CPU_set_2)))
-        if test_type=='exhaustive':
-            print('doing exhaustive scaling test')
-            scaling_test_set = itertools.product(CPU_set_1, CPU_set_2)
-        elif test_type=='patient':
-            print('doing patient scaling test')
-            scaling_test_set = itertools.combinations_with_replacement(CPU_set, 2)
-        else:
-            # symmetric_cobminations
-            print('doing minimal scaling test')
-            scaling_test_set = zip(CPU_set_1, CPU_set_2)
         res_string = '{:d}x{:d}x{:d}'.format(sim_nx, sim_ny, sim_nz)
     else:
-        print('testing {}, from {:d} to {:d} cores'.format(scaling_script, np.min(CPU_set),np.max(CPU_set)))
-        scaling_test_set = CPU_set
         res_string = '{:d}x{:d}'.format(sim_nx, sim_nz)
 
     # create scaling data file
@@ -138,7 +109,7 @@ def do_scaling_run(scaling_script, resolution, CPU_set, max_cores=None, min_core
 
     start_time = time.time()
 
-    for CPUs in scaling_test_set:
+    for CPUs in CPU_set:
         if dim == 3:
             ENV_N_TOTAL_CPU = np.prod(CPUs)
             cpu_group = '{:d}x{:d}'.format(CPUs[0],CPUs[1])
@@ -472,6 +443,36 @@ def finalize_plots(fig_set, ax_set):
     fig_set[4].savefig('scaling_DOF_weak.pdf')
 
 
+def determine_test(test_type='exhaustive', dim=None):
+        if dim == 3:
+            import itertools
+            CPU_set_1 = CPU_set
+            CPU_set_2 = CPU_set
+
+            if max_cores is not None:
+                if (np.max(CPU_set_1)**2) < max_cores:
+                    # append new element to front of set_2
+                    CPU_set_2 = np.append(2*np.max(CPU_set_2), CPU_set_2)
+            if min_cores is not None:
+                if (np.min(CPU_set_1)*np.min(CPU_set_2)) > min_cores:
+                    # append new element to end of set_1
+                    CPU_set_1 = np.append(CPU_set_1, np.int(np.min(CPU_set_1)/2))
+            print(CPU_set_1)
+            print(CPU_set_2)
+            print('testing from {:d} to {:d} cores'.format(np.min(CPU_set_1)*np.min(CPU_set_2),np.max(CPU_set_1)*np.max(CPU_set_2)))
+            if test_type=='exhaustive':
+                print('doing exhaustive scaling test')
+                scaling_test_set = itertools.product(CPU_set_1, CPU_set_2)
+            elif test_type=='patient':
+                print('doing patient scaling test')
+                scaling_test_set = itertools.combinations_with_replacement(CPU_set, 2)
+            else:
+                # symmetric_cobminations
+                print('doing minimal scaling test')
+                scaling_test_set = zip(CPU_set_1, CPU_set_2)
+        else:
+            print('testing {}, from {:d} to {:d} cores'.format(scaling_script, np.min(CPU_set),np.max(CPU_set)))
+            scaling_test_set = CPU_set
 
 if __name__ == "__main__":
 
