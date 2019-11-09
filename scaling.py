@@ -62,10 +62,7 @@ import subprocess
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-try:
-        plt.style.use('ggplot')
-except:
-        print("Upgrade matplotlib; for now we're falling back to old plot styles")
+plt.style.use('ggplot')
 
 import time
 import h5py
@@ -299,32 +296,29 @@ def plot_scaling_run(data_set, ax_set,
     else:
         label_string = data_set['plot_label_short'][0]
 
+    ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
+                   marker=marker, linestyle=linestyle, color=color)
+
+    ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
+                   marker=marker, linestyle='none', color=color, alpha=0.5)
+
+    ax_set[2].plot(min_pencils_per_core, DOF_cyles_per_cpusec, label=label_string,
+                   marker=marker, linestyle='none', color=color, alpha=0.5)
+
+    ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
+                   marker=marker,  linestyle='none', color=color)
+
     if ideal_curves:
         ideal_cores = np.sort(N_total_cpu)
         i_min = np.argmin(N_total_cpu)
         ideal_time = wall_time[i_min]*(N_total_cpu[i_min]/ideal_cores)
         ideal_time_per_iter = wall_time_per_iter[i_min]*(N_total_cpu[i_min]/ideal_cores)
 
-        ax_set[0].plot(ideal_cores, ideal_time, linestyle='--', color='black')
-
-        ax_set[1].plot(ideal_cores, ideal_time_per_iter, linestyle='--', color='black')
-
-
-
-    ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
-                   marker=marker, linestyle=linestyle, color=color)
-
-    if dim == 3:
-        linestyle='None'
-
-    ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
-                   marker=marker, linestyle=linestyle, color=color)
-
-    ax_set[2].plot(N_total_cpu, DOF_cyles_per_cpusec, label=label_string,
-                   marker=marker, linestyle=linestyle, color=color)
-
-    ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
-                   marker=marker,  linestyle=linestyle, color=color)
+        ax_set[0].plot(ideal_cores, ideal_time, linestyle='--', color='black', zorder=0)
+        ylim_0 = min(ax_set[1].get_ylim()[0], np.min(wall_time_per_iter))
+        ax_set[1].plot(ideal_cores, ideal_time_per_iter, linestyle='--', color='black', zorder=0)
+        ax_set[1].set_ylim(bottom=ylim_0)
+        #ax_set[1].set_ylim(emit=True)
 
     for i in range(4):
         ax_set[i].set_xscale('log', basex=2)
@@ -411,13 +405,21 @@ def finalize_plots(fig_set, ax_set):
     legend_with_ideal(ax_set[1], loc='lower left')
     xlim = ax_set[1].get_xlim()
     ax_set[1].set_xlim(0.9*xlim[0],1.1*xlim[1])
+    ylim = ax_set[1].get_ylim()
+    ax_set[1].set_ylim(1/2*ylim[0],2*ylim[1])
     fig_set[1].subplots_adjust(bottom=0.2)
     fig_set[1].savefig('scaling_time_per_iter.pdf')
 
-    ax_set[2].set_xlabel('N-core')
+    #ax_set[2].set_xlabel('N-core')
+    xlim = ax_set[2].get_xlim()
+    ax_set[2].set_xlim(xlim[1],xlim[0])
+    ax_set[2].set_xlabel('Pencils/core')
     ax_set[2].set_ylabel('DOF-cycles/cpu-sec')
-    ax_set[2].legend(loc='upper left')
+    ax_set[2].legend(loc='upper right')
+    ax_set[2].set_yscale('linear')
     fig_set[2].savefig('scaling_DOF.pdf')
+
+
 
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
