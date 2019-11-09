@@ -68,7 +68,8 @@ problem.add_equation("dx(u) + dy(v) + dz(w) = 0",     condition="(nx!=0) or  (ny
 
 
 # Build solver
-solver = problem.build_solver(de.timesteppers.RK222)
+#solver = problem.build_solver(de.timesteppers.RK222)
+solver = problem.build_solver(de.timesteppers.SBDF2)
 logger.info('Solver built')
 
 # Initial conditions : Taylor-Green forcing
@@ -106,15 +107,15 @@ if args['--IO']:
     snapshots.add_task('integ(u**2+v**2+w**2)',name='KE')
 
 # CFL
-CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=10, safety=1,
-                     max_change=1.5, min_change=0.5, max_dt=0.125, threshold=0.05)
-CFL.add_velocities(('u', 'v', 'w'))
+#CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=10, safety=1,
+#                     max_change=1.5, min_change=0.5, max_dt=0.125, threshold=0.05)
+#CFL.add_velocities(('u', 'v', 'w'))
 
 # Main loop
 try:
     logger.info('Starting loop')
     while solver.ok:
-        dt = CFL.compute_dt()
+        #dt = CFL.compute_dt()
         dt = solver.step(dt)
         log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
         logger.info(log_string)
@@ -128,7 +129,7 @@ finally:
     end_time = time.time()
 
     if (domain.distributor.rank==0):
-        N_TOTAL_CPU = domain.distributor.comm_cart.size
+        # Print statistics
         print('-' * 40)
         total_time = end_time-initial_time
         main_loop_time = end_time - start_time
@@ -143,7 +144,7 @@ finally:
         print("          N_cores, Nx, Nz, startup,    main loop,   main loop/iter, DOF-cycles/cpu-second")
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
-              ' {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
+              ' {:12.7g} {:12.7g} {:12.7g} {:12.7g}'.format(startup_time,
                                                                 main_loop_time,
                                                                 main_loop_time/n_steps,
                                                                 nx*ny*nz*n_steps/(N_TOTAL_CPU*main_loop_time)))
