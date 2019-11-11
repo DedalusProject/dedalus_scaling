@@ -74,22 +74,18 @@ z_basis = de.Chebyshev('z', nz, interval=(0, Lz), dealias=3/2)
 domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64, mesh=mesh)
 
 # 3D Boussinesq magnetohydrodynamics with vector potential formulism
-problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w','phi','Ax','Ay','Az','Bx','By'])
-#problem.meta['p','T','u','v','w','Ay','Ax','Az','phi']['z']['dirichlet'] = True
+problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w','phi','Ax','Ay','Az','Bx','By', 'Jx', 'Jy'])
 problem.meta[:]['z']['dirichlet'] = True
 
 problem.substitutions['UdotGrad(A,A_z)'] = '(u*dx(A) + v*dy(A) + w*(A_z))'
 problem.substitutions['BdotGrad(A,A_z)'] = '(Bx*dx(A) + By*dy(A) + Bz*(A_z))'
 problem.substitutions['Lap(A,A_z)'] = '(dx(dx(A)) + dy(dy(A)) + dz(A_z))'
 problem.substitutions['Bz'] = '(dx(Ay) - dy(Ax))'
-problem.substitutions['Jx'] = '(dy(Bz) - dz(By))'
-problem.substitutions['Jy'] = '(dz(Bx) - dx(Bz))'
 problem.substitutions['Jz'] = '(dx(By) - dy(Bx))'
 problem.substitutions['Oz'] = '(dx(v)  - dy(u))'
 problem.substitutions['Kx'] = '(dy(Oz) - dz(Oy))'
 problem.substitutions['Ky'] = '(dz(Ox) - dx(Oz))'
 problem.substitutions['Kz'] = '(dx(Oy) - dy(Ox))'
-
 problem.parameters['P'] = (Rayleigh * Prandtl)**(-1/2)
 problem.parameters['R'] = (Rayleigh / Prandtl)**(-1/2)
 problem.parameters['Rm'] = (Rayleigh / MagneticPrandtl)**(-1/2)
@@ -97,9 +93,9 @@ problem.parameters['F'] = F = 1
 problem.parameters['pi'] = np.pi
 problem.add_equation("dt(T) - P*Lap(T, T_z)         - F*w = -UdotGrad(T, T_z)")
 # O == omega = curl(u);  K = curl(O)
-problem.add_equation("dt(u)  + R*Kx  + dx(p)              =  v*Oz - w*Oy + Jy*Bz - Jz*By")
-problem.add_equation("dt(v)  + R*Ky  + dy(p)              =  w*Ox - u*Oz + Jz*Bx - Jx*Bz")
-problem.add_equation("dt(w)  + R*Kz  + dz(p)    -T        =  u*Oy - v*Ox + Jx*By - Jy*Bx")
+problem.add_equation("dt(u)  +  R*Kx + dx(p)              =  v*Oz - w*Oy + Jy*Bz - Jz*By")
+problem.add_equation("dt(v)  +  R*Ky + dy(p)              =  w*Ox - u*Oz + Jz*Bx - Jx*Bz")
+problem.add_equation("dt(w)  +  R*Kz + dz(p)    -T        =  u*Oy - v*Ox + Jx*By - Jy*Bx")
 problem.add_equation("dt(Ax) + Rm*Jx + dx(phi)            =  v*Bz - w*By")
 problem.add_equation("dt(Ay) + Rm*Jy + dy(phi)            =  w*Bx - u*Bz")
 problem.add_equation("dt(Az) + Rm*Jz + dz(phi)            =  u*By - v*Bx")
@@ -107,6 +103,8 @@ problem.add_equation("dx(u) + dy(v) + dz(w) = 0")
 problem.add_equation("dx(Ax) + dy(Ay) + dz(Az) = 0")
 problem.add_equation("Bx + dz(Ay) - dy(Az) = 0")
 problem.add_equation("By - dz(Ax) + dx(Az) = 0")
+problem.add_equation("Jx - (dy(Bz) - dz(By)) = 0")
+problem.add_equation("Jy - (dz(Bx) - dx(Bz)) = 0")
 problem.add_equation("Ox + dz(v) - dy(w) = 0")
 problem.add_equation("Oy - dz(u) + dx(w) = 0")
 problem.add_equation("T_z - dz(T) = 0")
