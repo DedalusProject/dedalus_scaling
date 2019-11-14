@@ -129,6 +129,8 @@ finally:
     end_time = time.time()
 
     if (domain.distributor.rank==0):
+        N_TOTAL_CPU = domain.distributor.comm_cart.size
+        
         # Print statistics
         print('-' * 40)
         total_time = end_time-initial_time
