@@ -110,7 +110,7 @@ problem.add_bc("right(p) = 0", condition="(nx == 0) and (ny == 0)")
 
 # Build solver
 #solver = problem.build_solver(de.timesteppers.RK443)
-solver = problem.build_solver(de.timesteppers.RK222)
+solver = problem.build_solver(de.timesteppers.SBDF2)
 logger.info('Solver built')
 
 # Initial conditions
@@ -138,31 +138,23 @@ T.set_scales(1, keep_data=True)
 
 # Initial timestep
 dt = 1e-3 #0.125
+nstart = 5
+niter = int(float(args['--niter']))
 
-niter = int(float(args['--niter']))+1
 # Integration parameters
-solver.stop_sim_time = 50
 solver.stop_wall_time = 30 * 60.
-solver.stop_iteration = niter
-
-max_dt = 0.5
-# CFL
-CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=1, safety=0.8/2,
-                     max_change=1.5, min_change=0.5, max_dt=max_dt, threshold=0.05)
-CFL.add_velocities(('u', 'v', 'w'))
+solver.stop_iteration = nstart + niter
 
 # Main
 try:
     logger.info('Starting loop')
-    first_loop = True
     while solver.ok:
-        dt = CFL.compute_dt()
+        #dt = CFL.compute_dt()
         dt = solver.step(dt)
         log_string = 'Iteration: %i, Time: %e, dt: %e' %(solver.iteration, solver.sim_time, dt)
         logger.info(log_string)
-        if first_loop:
+        if solver.iteration == nstart:
             start_time = time.time()
-            first_loop = False
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
@@ -181,7 +173,7 @@ finally:
         total_time = end_time-initial_time
         main_loop_time = end_time - start_time
         startup_time = start_time-initial_time
-        n_steps = solver.iteration-1
+        n_steps = solver.iteration - nstart
         print('  startup time:', startup_time)
         print('main loop time:', main_loop_time)
         print('    total time:', total_time)

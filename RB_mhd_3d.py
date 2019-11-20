@@ -172,14 +172,6 @@ solver.stop_sim_time = 50
 solver.stop_wall_time = 30 * 60.
 solver.stop_iteration = niter
 
-max_dt = 0.5
-# CFL
-#CFL = flow_tools.CFL(solver, initial_dt=dt, cadence=1, safety=0.8/2,
-#                     max_change=1.5, min_change=0.5, max_dt=max_dt, threshold=0.05)
-#CFL.add_velocities(('u', 'v', 'w'))
-#CFL.add_velocities(('Bx', 'By', 'Bz'))
-
-
 # Main
 try:
     logger.info('Starting loop')
