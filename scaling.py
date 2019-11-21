@@ -76,6 +76,37 @@ def num(s):
 ######################
 
 def build_mesh_list(n_z, mesh_dim=2, test_type='exhaustive', one_pencil=None, max_cores=None, min_cores=None):
+
+        if test_type == "simple":
+            nz = n_z
+            # Try all powers of 2 between min and max
+            ln2_min = np.floor(np.log2(min_cores))
+            ln2_max = np.floor(np.log2(max_cores))
+            corelist = 2**np.arange(ln2_min, ln2_max+1, dtype=int)
+            # Build mesh list
+            if mesh_dim == 1:
+                mesh_list = []
+                # Assume nx = nz
+                nx = nz
+                px = nx // 2
+                # Scale until empty cores
+                for cores in corelist:
+                    if cores <= px:
+                        mesh_list.append(cores)
+            elif mesh_dim == 2:
+                mesh_list = []
+                # Assume nx = ny = nz
+                nx = ny = nz
+                px = nx // 2
+                py = ny
+                # Scale fully over x, then over y until empty cores
+                for cores in corelist:
+                    if cores <= px:
+                        mesh_list.append((cores, 1))
+                    elif cores <= (px * py):
+                        mesh_list.append((px, cores//px))
+            return mesh_list
+
         if one_pencil:
             print("Pushing to one pencil per core in coeff space; this may be inefficient depending on dealias padding choice.")
             n_z_2 = np.log(n_z)/np.log(2)
