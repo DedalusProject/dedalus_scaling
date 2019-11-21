@@ -27,34 +27,27 @@ following the example scripts.  In a future revision, that output will
 be rolled into this scaling.py package.
 
 
-
 Usage:
     scaling.py run <scaling_script> [<nz> options]
     scaling.py plot <files>... [options]
 
 Options:
-    <nz>                   resolution in z (fourier or chebyshev) direction [default: 256]
-    --nx=<nx>              resolution in x (fourier); default is nz
-    --ny=<ny>              resolution in y (fourier); default is nz
-
-    --label=<label>        Label for output file
-    --niter=<niter>        Number of iterations to run for [default: 100]
-    --verbose              Print verbose output at end of each run (stdout and stderr)
-
-    --3D                   Run 3D script with 2D mesh domain decomposition
-    --one-pencil           Push to one pencil per core in coeff space
-    --test-type            Mesh-selection strategy [default: exhaustive]
-
-    --max-cores=<max-cores>      Max number of available cores
-    --min-cores=<min-cores>      Min number of cores to use
-
-    --output=<dir>         Output directory [default: ./scaling]
-
-    --clean_plot           Remove run-specific labels during plotting (e.g., for proposals or papers)
-
-    --OpenMPI              Assume we're in an OpenMPI env; default if nothing else is selected
-    --MPISGI               Assume we're in a SGI-MPT env (e.g., NASA Pleiades)
-    --IntelMPI             Assume we're in an IntelMPI env (e.g., PSC Bridges)
+    <nz>                        resolution in z (fourier or chebyshev) direction [default: 256]
+    --nx=<nx>                   resolution in x (fourier); default is nz
+    --ny=<ny>                   resolution in y (fourier); default is nz
+    --label=<label>             Label for output file
+    --niter=<niter>             Number of iterations to run for [default: 100]
+    --verbose                   Print verbose output at end of each run (stdout and stderr)
+    --3D                        Run 3D script with 2D mesh domain decomposition
+    --one-pencil                Push to one pencil per core in coeff space
+    --test-type=<test-type>     Mesh-selection strategy [default: exhaustive]
+    --max-cores=<max-cores>     Max number of available cores
+    --min-cores=<min-cores>     Min number of cores to use
+    --output=<dir>              Output directory [default: ./scaling]
+    --clean_plot                Remove run-specific labels during plotting (e.g., for proposals or papers)
+    --OpenMPI                   Assume we're in an OpenMPI env; default if nothing else is selected
+    --MPISGI                    Assume we're in a SGI-MPT env (e.g., NASA Pleiades)
+    --IntelMPI                  Assume we're in an IntelMPI env (e.g., PSC Bridges)
 
 """
 
@@ -66,10 +59,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
-
 import time
 import h5py
 import pathlib
+
 
 def num(s):
     try:
@@ -414,7 +407,6 @@ def initialize_plots(num_figs, fontsize=12):
     x_size = 7 # width of single column in inches
     y_size = x_size/scpconst.golden
 
-
     for i in range(num_figs):
         fig = plt.figure(figsize=(x_size, y_size))
         ax = fig.add_subplot(1,1,1)
@@ -496,8 +488,6 @@ def finalize_plots(fig_set, ax_set):
     ax_set[2].legend(loc='upper right')
     ax_set[2].set_yscale('linear')
     fig_set[2].savefig('scaling_DOF.pdf')
-
-
 
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
