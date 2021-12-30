@@ -26,6 +26,8 @@ These scaling scripts should output well formated scaling outputs,
 following the example scripts.  In a future revision, that output will
 be rolled into this scaling.py package.
 
+Note that the subprocess command as currently used executes within a shell
+environment.  Please ensure that all inputs are appropriately sanitized.
 
 Usage:
     scaling.py run <scaling_script> [<nz> options]
@@ -48,6 +50,7 @@ Options:
     --OpenMPI                   Assume we're in an OpenMPI env; default if nothing else is selected
     --MPISGI                    Assume we're in a SGI-MPT env (e.g., NASA Pleiades)
     --IntelMPI                  Assume we're in an IntelMPI env (e.g., PSC Bridges)
+    --Slurm                     Assume we're in a Slurm env (e.g., Archer2)
 
 """
 
@@ -172,8 +175,8 @@ def build_mesh_list(n_z, mesh_dim=2, test_type='exhaustive', one_pencil=None, ma
 def do_scaling_run(scaling_script, resolution, CPU_set,
                    niter=None, mesh_dim=2,
                    verbose=None, label=None,
-                   OpenMPI=None, MPISGI=None, IntelMPI=None):
-    if OpenMPI is None and IntelMPI is None and MPISGI is None:
+                   OpenMPI=None, MPISGI=None, IntelMPI=None, Slurm=None):
+    if OpenMPI is None and IntelMPI is None and MPISGI is None and Slurm is None:
         OpenMPI = True
 
     dim = len(resolution)
@@ -220,19 +223,20 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
                             N_Z='{:d}'.format(sim_nz),
                             N_TOTAL_CPU='{:d}'.format(ENV_N_TOTAL_CPU))
             if OpenMPI:
-                commands = ["mpirun", "-n","{:d}".format(ENV_N_TOTAL_CPU),
-                            "--bind-to", "core", "--map-by", "core"]
+                commands = 'mpirun -n {:d} --bind-to core --map-by core'.format(ENV_N_TOTAL_CPU)
             elif MPISGI:
-                commands = ['mpiexec_mpt', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+                commands = 'mpiexec_mpt -n {:d}'.format(ENV_N_TOTAL_CPU)
             elif IntelMPI:
-                commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+                commands = 'mpirun -n {:d}'.format(ENV_N_TOTAL_CPU)
+            elif Slurm:
+                commands = 'srun -n {:d} --distribution=block:block --hint=nomultithread'.format(ENV_N_TOTAL_CPU)
             else:
-                commands = ['mpirun', "-n","{:d}".format(ENV_N_TOTAL_CPU)]
+                commands = 'mpirun -n {:d}'.format(ENV_N_TOTAL_CPU)
 
-            commands += ["python3", scaling_script, "--nz={:d}".format(sim_nz), "--nx={:d}".format(sim_nx)]
+            commands += ' python3 {:s} --nz={:d} --nx={:d}'.format(scaling_script, sim_nz, sim_nx)
             if mesh_dim == 2:
-                commands.append("--mesh={:d},{:d}".format(CPUs[0], CPUs[1]))
-                commands.append("--ny={:d}".format(sim_ny))
+                commands += ' --mesh={:d},{:d}'.format(CPUs[0], CPUs[1])
+                commands += ' --ny={:d}'.format(sim_ny)
                 print(" pencils/core (0): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], sim_ny/CPUs[1], 1/2*sim_nx*sim_ny/(CPUs[0]*CPUs[1])))
                 print(" pencils/core (2): {:g}x{:g}={:g}".format(1/2*sim_nx/CPUs[0], 3/2*sim_nz/CPUs[1], 1/2*sim_nx*3/2*sim_nz/(CPUs[0]*CPUs[1])))
                 print(" pencils/core (4): {:g}x{:g}={:g}".format(3/2*sim_ny/CPUs[0], 3/2*sim_nz/CPUs[1], 3/2*sim_ny*3/2*sim_nz/(CPUs[0]*CPUs[1])))
@@ -242,11 +246,12 @@ def do_scaling_run(scaling_script, resolution, CPU_set,
                                                                               sim_nz/ENV_N_TOTAL_CPU, 3/2*sim_nz/ENV_N_TOTAL_CPU))
                 min_pencils_per_core = min(1/2*sim_nx/ENV_N_TOTAL_CPU, sim_nz/ENV_N_TOTAL_CPU)
             if niter is not None:
-                commands += ["--niter={:d}".format(niter)]
+                commands += ' --niter={:d}'.format(niter)
 
-            print("command: "+" ".join(commands))
+            print('command: {:s}'.format(commands))
             proc = subprocess.run(commands,
                                   env=test_env,
+                                  shell=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             stdout, stderr = proc.stdout, proc.stderr
 
@@ -382,7 +387,7 @@ def plot_scaling_run(data_set, ax_set,
     elif dim == 3 :
         resolution = [sim_nx, sim_ny, sim_nz]
 
-    if color is 'None':
+    if color == 'None':
         color=next(ax_set[0]._get_lines.prop_cycler)['color']
 
     if clean_plot:
@@ -394,6 +399,7 @@ def plot_scaling_run(data_set, ax_set,
         label_string = plot_label
     else:
         label_string = data_set['plot_label_short'][0]
+    label_string=None
 
     ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
@@ -420,13 +426,15 @@ def plot_scaling_run(data_set, ax_set,
         #ax_set[1].set_ylim(emit=True)
 
     for i in range(4):
-        ax_set[i].set_xscale('log', basex=2)
+        ax_set[i].set_xscale('log', base=2)
         ax_set[i].set_yscale('log')
         ax_set[i].margins(x=0.05, y=0.05)
 
     #i_max = N_total_cpu.argmax()
     i_max = min_pencils_per_core.argmin()
-    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], label=label_string +' ({:d}/core)'.format(int(min_pencils_per_core[i_max])),
+#    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], label=label_string +' ({:d}/core)'.format(int(min_pencils_per_core[i_max])),
+#                     marker=marker,  linestyle=linestyle, color=color)
+    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], #label=label_string,
                      marker=marker,  linestyle=linestyle, color=color)
 
 
@@ -482,7 +490,7 @@ def add_base10_axis(ax):
     ax10.spines["bottom"].set_visible(True)
 
     tick_locs = ax.xaxis.get_ticklocs()
-    ax10.set_xscale('log', basex=2)
+    ax10.set_xscale('log', base=2)
     ax10.grid()
     #ax10.grid(b=False) # suppress gridlines
     ax10.set_xticks(tick_locs)
@@ -563,7 +571,8 @@ if __name__ == "__main__":
         print(40*'=')
         # Do scaling run
         start_time = time.time()
-        do_scaling_run(args['<scaling_script>'], resolution, mesh_list, niter=int(float(args['--niter'])), mesh_dim=mesh_dim, verbose=args['--verbose'], label=args['--label'], OpenMPI=args['--OpenMPI'], MPISGI=args['--MPISGI'], IntelMPI=args['--IntelMPI'])
+        do_scaling_run(args['<scaling_script>'], resolution, mesh_list, niter=int(float(args['--niter'])), mesh_dim=mesh_dim, verbose=args['--verbose'], label=args['--label'],
+                       OpenMPI=args['--OpenMPI'], MPISGI=args['--MPISGI'], IntelMPI=args['--IntelMPI'], Slurm=args['--Slurm'])
         end_time = time.time()
         print(40*'=')
         print('scaling run finished')
