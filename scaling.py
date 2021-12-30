@@ -393,21 +393,20 @@ def plot_scaling_run(data_set, ax_set,
     if clean_plot:
         plot_label = data_set['plot_label'][0].split('-')[0]
     else:
-        plot_label = data_set['plot_label'][0]
+        plot_label = str(data_set['plot_label_short'][0])
 
     if explicit_label:
         label_string = plot_label
     else:
-        label_string = data_set['plot_label_short'][0]
-    label_string=None
-
+        label_string = str(data_set['plot_label_short'][0])
+    print(type(label_string))
     ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
 
     ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
                    marker=marker, linestyle='none', color=color, alpha=0.5)
 
-    ax_set[2].plot(min_pencils_per_core, DOF_cyles_per_cpusec, label=label_string,
+    ax_set[2].plot(min_pencils_per_core, DOF_cyles_per_cpusec/1e5, label=label_string,
                    marker=marker, linestyle='none', color=color, alpha=0.5)
 
     ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
@@ -429,13 +428,6 @@ def plot_scaling_run(data_set, ax_set,
         ax_set[i].set_xscale('log', base=2)
         ax_set[i].set_yscale('log')
         ax_set[i].margins(x=0.05, y=0.05)
-
-    #i_max = N_total_cpu.argmax()
-    i_max = min_pencils_per_core.argmin()
-#    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], label=label_string +' ({:d}/core)'.format(int(min_pencils_per_core[i_max])),
-#                     marker=marker,  linestyle=linestyle, color=color)
-    ax_set[4].plot(N_total_cpu[i_max], DOF_cyles_per_cpusec[i_max], #label=label_string,
-                     marker=marker,  linestyle=linestyle, color=color)
 
 
 def initialize_plots(num_figs, fontsize=12):
@@ -517,27 +509,24 @@ def finalize_plots(fig_set, ax_set):
     ylim = ax_set[1].get_ylim()
     ax_set[1].set_ylim(1/2*ylim[0],2*ylim[1])
     fig_set[1].subplots_adjust(bottom=0.2)
+    plt.tight_layout()
     fig_set[1].savefig('scaling_time_per_iter.pdf')
 
     #ax_set[2].set_xlabel('N-core')
     xlim = ax_set[2].get_xlim()
     ax_set[2].set_xlim(xlim[1],xlim[0])
     ax_set[2].set_xlabel('Pencils/core')
-    ax_set[2].set_ylabel('DOF-cycles/cpu-sec')
+    ax_set[2].set_ylabel(r'$10^5$ mode-iters/core-sec')
     ax_set[2].legend(loc='upper right')
     ax_set[2].set_yscale('linear')
+    plt.tight_layout()
     fig_set[2].savefig('scaling_DOF.pdf')
 
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
     ax_set[3].legend(loc='lower left')
+    plt.tight_layout()
     fig_set[3].savefig('scaling_startup.pdf')
-
-    ax_set[4].set_xlabel('N-core')
-    ax_set[4].set_ylabel('DOF-cycles/cpu-sec')
-    ax_set[4].legend(loc='upper left')
-    fig_set[4].savefig('scaling_DOF_weak.pdf')
-
 
 if __name__ == "__main__":
 
@@ -592,7 +581,7 @@ if __name__ == "__main__":
         if not output_path.exists():
             output_path.mkdir()
         # Plot
-        fig_set, ax_set = initialize_plots(5)
+        fig_set, ax_set = initialize_plots(4)
         for file in args['<files>']:
             data_set = read_scaling_run(file)
             for res in natural_sort(data_set.keys(), reverse=True):
