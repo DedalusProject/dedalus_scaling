@@ -357,7 +357,7 @@ def plot_scaling_run(data_set, ax_set,
                      ideal_curves = True,
                      linestyle='solid', marker='o', color='None',
                      explicit_label = True, clean_plot=False,
-                     dim=None):
+                     dim=None, zorder=None):
 
     sim_nx = data_set['sim_nx']
     sim_nz = data_set['sim_nz']
@@ -401,16 +401,16 @@ def plot_scaling_run(data_set, ax_set,
         label_string = data_set['plot_label_short'][0].decode('UTF-8')
 
     ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
-                   marker=marker, linestyle=linestyle, color=color)
+                   marker=marker, linestyle=linestyle, color=color, zorder=zorder)
 
     ax_set[1].plot(N_total_cpu, wall_time_per_iter, label=label_string,
-                   marker=marker, linestyle='none', color=color, alpha=0.5)
+                   marker=marker, linestyle='none', color=color, alpha=0.5, zorder=zorder)
 
     ax_set[2].plot(min_pencils_per_core, DOF_cyles_per_cpusec/1e5, label=label_string,
-                   marker=marker, linestyle='none', color=color, alpha=0.5)
+                   marker=marker, linestyle='none', color=color, alpha=0.5, zorder=zorder)
 
     ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
-                   marker=marker,  linestyle='none', color=color)
+                   marker=marker,  linestyle='none', color=color, zorder=zorder)
 
     if ideal_curves:
         ideal_cores = np.sort(N_total_cpu)
@@ -582,9 +582,12 @@ if __name__ == "__main__":
             output_path.mkdir()
         # Plot
         fig_set, ax_set = initialize_plots(4)
+        zorder_base = 2
         for file in args['<files>']:
             data_set = read_scaling_run(file)
-            for res in natural_sort(data_set.keys(), reverse=True):
-                print('plotting run: {:}'.format(res))
-                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'])
+            n_res = len(data_set)
+            for i_res, res in enumerate(natural_sort(data_set.keys(), reverse=True)):
+                zorder = (n_res-i_res-1)/n_res+zorder_base
+                print('plotting run: {:} at layer {:.2f}'.format(res, zorder))
+                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'], zorder=zorder)
         finalize_plots(fig_set, ax_set)
