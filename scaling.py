@@ -393,13 +393,13 @@ def plot_scaling_run(data_set, ax_set,
     if clean_plot:
         plot_label = data_set['plot_label'][0].split('-')[0]
     else:
-        plot_label = str(data_set['plot_label_short'][0])
+        plot_label = data_set['plot_label_short'][0].decode('UTF-8')
 
     if explicit_label:
         label_string = plot_label
     else:
-        label_string = str(data_set['plot_label_short'][0])
-    print(type(label_string))
+        label_string = data_set['plot_label_short'][0].decode('UTF-8')
+
     ax_set[0].plot(N_total_cpu, wall_time, label=label_string,
                    marker=marker, linestyle=linestyle, color=color)
 
@@ -436,7 +436,7 @@ def initialize_plots(num_figs, fontsize=12):
     ax_set = []
 
     x_size = 7 # width of single column in inches
-    y_size = x_size/scpconst.golden
+    y_size = x_size/scpconst.golden*1.1
 
     for i in range(num_figs):
         fig = plt.figure(figsize=(x_size, y_size))
