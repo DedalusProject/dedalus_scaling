@@ -12,7 +12,7 @@ the equations are the same as in 3D.
 This version of the script is intended for scaling and performance tests.
 
 Usage:
-    rayleigh_benard_mhd_A_2.5d_scaling.py [options] 
+    rayleigh_benard_mhd_A_2.5d_scaling.py [options]
 
 Options:
     --nz=<nz>                 Number of Chebyshev modes [default: 128]
@@ -61,8 +61,6 @@ domain = de.Domain([x_basis, z_basis], grid_dtype=np.float64)
 
 # 3D Boussinesq magnetohydrodynamics with vector potential formulism
 problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w','phi','Ax','Ay','Az','Bx','By'])
-#problem.meta['p','T','u','v','w','Ay','Ax','Az','phi']['z']['dirichlet'] = True
-problem.meta[:]['z']['dirichlet'] = True
 problem.substitutions['UdotGrad(A,A_z)'] = '(u*dx(A) + w*(A_z))'
 problem.substitutions['BdotGrad(A,A_z)'] = '(Bx*dx(A) + Bz*(A_z))'
 problem.substitutions['Lap(A,A_z)'] = '(dx(dx(A)) + dz(A_z))'
@@ -148,7 +146,7 @@ Ay['g'] =  B0*np.sin(np.pi*z/Lz)
 Bx['g'] = (-1*np.pi/Lz)*B0*np.cos(np.pi*z/Lz)
 
 # Initial timestep
-dt = 1e-3 
+dt = 1e-3
 
 # Integration parameters
 solver.stop_sim_time = 50
@@ -213,8 +211,8 @@ finally:
         print('scaling:',
               ' {:d} {:d} {:d}'.format(N_TOTAL_CPU,nx,nz),
               ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
-                                                                main_loop_time, 
-                                                                main_loop_time/n_steps, 
-                                                                main_loop_time/n_steps/(nx*nz), 
+                                                                main_loop_time,
+                                                                main_loop_time/n_steps,
+                                                                main_loop_time/n_steps/(nx*nz),
                                                                 N_TOTAL_CPU*main_loop_time/n_steps/(nx*nz)))
         print('-' * 40)
