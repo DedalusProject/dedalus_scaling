@@ -65,7 +65,6 @@ domain = de.Domain([x_basis, y_basis, z_basis], grid_dtype=np.float64, mesh=mesh
 
 # 3D Boussinesq magnetohydrodynamics
 problem = de.IVP(domain, variables=['T','T_z','Ox','Oy','p','u','v','w'])
-problem.meta[:]['z']['dirichlet'] = True
 problem.substitutions['UdotGrad(A,A_z)'] = '(u*dx(A) + v*dy(A) + w*(A_z))'
 problem.substitutions['Lap(A,A_z)'] = '(dx(dx(A)) + dy(dy(A)) + dz(A_z))'
 problem.substitutions['Oz'] = '(dx(v)  - dy(u))'
