@@ -521,6 +521,7 @@ def finalize_plots(fig_set, ax_set):
     ax_set[2].set_yscale('linear')
     plt.tight_layout()
     fig_set[2].savefig('scaling_DOF.pdf')
+    fig_set[2].savefig('scaling_DOF.png', dpi=300)
 
     ax_set[3].set_xlabel('N-core')
     ax_set[3].set_ylabel('startup time [s]')
