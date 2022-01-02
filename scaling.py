@@ -47,7 +47,7 @@ Options:
     --min-cores=<min-cores>     Min number of cores to use
     --output=<dir>              Output directory [default: ./scaling]
     --clean_plot                Remove run-specific labels during plotting (e.g., for proposals or papers)
-    --spread                    Add random jitter in ncpu to spread out overlapping points
+    --spread                    Add random jitter in x to spread out overlapping points; default value is 5%
     --OpenMPI                   Assume we're in an OpenMPI env; default if nothing else is selected
     --MPISGI                    Assume we're in a SGI-MPT env (e.g., NASA Pleiades)
     --IntelMPI                  Assume we're in an IntelMPI env (e.g., PSC Bridges)
@@ -358,7 +358,7 @@ def plot_scaling_run(data_set, ax_set,
                      ideal_curves = True,
                      linestyle='solid', marker='o', color='None',
                      explicit_label = True, clean_plot=False,
-                     spread=False,
+                     spread=None,
                      dim=None, zorder=None):
 
     sim_nx = data_set['sim_nx']
