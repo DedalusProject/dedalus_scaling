@@ -61,7 +61,7 @@ Prandtl = 1
 dealias = float(args['--dealias'])
 stop_sim_time = np.inf
 timestepper = d3.SBDF2 #RK222
-max_timestep = 0.1
+max_timestep = 1e-3
 dtype = np.float64
 
 # Bases
@@ -108,17 +108,24 @@ b0['g'] = Lz - z
 
 dot = lambda A, B: d3.DotProduct(A, B)
 
+ex = dist.VectorField(coords, name='ex')
+ey = dist.VectorField(coords, name='ey')
+ex['g'][0] = 1
+ey['g'][1] = 1
+
 # Problem
-problem = d3.IVP([p, b, u, τp, τ1b, τ2b, τ1u, τ2u], namespace=locals())
-problem.add_equation("div(u) + dot(lift1(τ2u,-1),ez1) + τp = 0")
+problem = d3.IVP([p, b, u, τ1b, τ2b, τ1u, τ2u], namespace=locals())
+problem.add_equation("div(u) + dot(lift1(τ2u,-1),ez1) = 0")
 problem.add_equation("dt(b) + dot(u, grad(b0)) - kappa*lap(b) + lift(τ2b,-2) + lift(τ1b,-1) = - dot(u,grad(b))")
 # TODO: go to cross(u, curl(u)) form of momentum nonlinearity
 problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift(τ2u,-2) + lift(τ1u,-1) - b*ez = -dot(u,grad(u))") #cross(u, curl(u))")
 problem.add_equation("b(z=0) = 0")
 problem.add_equation("u(z=0) = 0")
 problem.add_equation("b(z=Lz) = 0")
-problem.add_equation("u(z=Lz) = 0")
-problem.add_equation("integ(p) = 0") # Pressure gauge
+problem.add_equation("u(z=Lz) = 0", condition="nx != 0 or ny != 0")
+problem.add_equation("dot(ex,u)(z=Lz) = 0", condition="nx == 0 and ny == 0")
+problem.add_equation("dot(ey,u)(z=Lz) = 0", condition="nx == 0 and ny == 0")
+problem.add_equation("p(z=Lz) = 0", condition="nx == 0 and ny == 0") # Pressure gauge
 
 # Solver
 solver = problem.build_solver(timestepper)
@@ -136,7 +143,7 @@ CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.5, threshold=0
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
-cadence = 10
+cadence = 50
 # Flow properties
 flow = d3.GlobalFlowProperty(solver, cadence=cadence)
 flow.add_property(np.sqrt(d3.dot(u,u))/nu, name='Re')
