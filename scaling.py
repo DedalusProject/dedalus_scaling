@@ -47,6 +47,7 @@ Options:
     --min-cores=<min-cores>     Min number of cores to use
     --output=<dir>              Output directory [default: ./scaling]
     --clean_plot                Remove run-specific labels during plotting (e.g., for proposals or papers)
+    --spread                    Add random jitter in ncpu to spread out overlapping points
     --OpenMPI                   Assume we're in an OpenMPI env; default if nothing else is selected
     --MPISGI                    Assume we're in a SGI-MPT env (e.g., NASA Pleiades)
     --IntelMPI                  Assume we're in an IntelMPI env (e.g., PSC Bridges)
@@ -357,12 +358,20 @@ def plot_scaling_run(data_set, ax_set,
                      ideal_curves = True,
                      linestyle='solid', marker='o', color='None',
                      explicit_label = True, clean_plot=False,
+                     spread=False,
                      dim=None, zorder=None):
 
     sim_nx = data_set['sim_nx']
     sim_nz = data_set['sim_nz']
-    N_total_cpu = data_set['N_total_cpu']
+    N_total_cpu = np.array(data_set['N_total_cpu'])
     min_pencils_per_core = data_set['min_pencils_per_core']
+    if spread:
+        ncases = len(N_total_cpu)
+        from numpy.random import default_rng
+        rng = default_rng()
+        jitter = rng.uniform(size=ncases, low=-0.05,high=0.05)
+        N_total_cpu += (N_total_cpu*jitter).astype(int)
+        min_pencils_per_core += min_pencils_per_core*jitter
     N_x = data_set['N_x']
     N_z = data_set['N_z']
     if dim is None:
@@ -590,5 +599,5 @@ if __name__ == "__main__":
             for i_res, res in enumerate(natural_sort(data_set.keys(), reverse=True)):
                 zorder = (n_res-i_res-1)/n_res+zorder_base
                 print('plotting run: {:} at layer {:.2f}'.format(res, zorder))
-                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'], zorder=zorder)
+                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'], zorder=zorder, spread=args['--spread'])
         finalize_plots(fig_set, ax_set)
