@@ -10,6 +10,7 @@ Options:
     --nz=<nz>              Vertical modes   [default: 64]
 
     --niter=<iter>         Timing iterations [default: 100]
+    --nstart=<nstart>      Startup iterations [default: 10]
 
     --dealias=<dealias>         Dealiasing [default: 1.5]
 
@@ -148,7 +149,7 @@ cadence = 50
 flow = d3.GlobalFlowProperty(solver, cadence=cadence)
 flow.add_property(np.sqrt(d3.dot(u,u))/nu, name='Re')
 
-startup_iter = 10
+startup_iter = int(float(args['--nstart']))
 # Main loop
 try:
     good_solution = True

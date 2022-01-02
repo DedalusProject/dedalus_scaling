@@ -12,6 +12,7 @@ Options:
     --Rayleigh=<Rayleigh>  Rayleigh number [default: 1e6]
 
     --niter=<iter>         How many iterations to run for [default: 100]
+    --nstart=<nstart>      Startup iterations [default: 10]
 
     --label=<label>        Additional label for run output directory
 """
@@ -140,7 +141,7 @@ CFL.add_velocity(u)
 flow = d3.GlobalFlowProperty(solver, cadence=cadence)
 flow.add_property(np.sqrt(d3.dot(u,u))/nu, name='Re')
 
-startup_iter = 10
+startup_iter = int(float(args['--nstart']))
 # Main loop
 try:
     good_solution = True
