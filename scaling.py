@@ -129,7 +129,7 @@ def build_mesh_list(n_z, mesh_dim=2, test_type='exhaustive', one_pencil=None, ma
     n_z_2_min = n_z_2-log_2_span
 
     if min_cores is not None:
-        min_cores = np.int(args['--min-cores'])
+        min_cores = int(args['--min-cores'])
         log2_min = np.log(min_cores)/np.log(2)
         if mesh_dim == 2:
             log2_min = log2_min/2
@@ -154,7 +154,7 @@ def build_mesh_list(n_z, mesh_dim=2, test_type='exhaustive', one_pencil=None, ma
         if min_cores is not None:
             if (np.min(CPU_set_1)*np.min(CPU_set_2)) > min_cores:
                 # append new element to end of set_1
-                CPU_set_1 = np.append(CPU_set_1, np.int(np.min(CPU_set_1)/2))
+                CPU_set_1 = np.append(CPU_set_1, int(np.min(CPU_set_1)/2))
         print('testing from {:d} to {:d} cores'.format(np.min(CPU_set_1)*np.min(CPU_set_2),np.max(CPU_set_1)*np.max(CPU_set_2)))
         if test_type=='exhaustive':
             print('doing exhaustive scaling test')
@@ -560,8 +560,8 @@ if __name__ == "__main__":
             resolution = [n_x, n_z]
             mesh_dim = 1
         # Core limits
-        max_cores = np.int(args['--max-cores']) if args['--max-cores'] else None
-        min_cores = np.int(args['--min-cores']) if args['--min-cores'] else None
+        max_cores = int(args['--max-cores']) if args['--max-cores'] else None
+        min_cores = int(args['--min-cores']) if args['--min-cores'] else None
         # Get CPU set
         print(40*'=')
         print("beginning scaling run with resolution: {}".format(resolution))
@@ -593,11 +593,14 @@ if __name__ == "__main__":
         # Plot
         fig_set, ax_set = initialize_plots(4)
         zorder_base = 2
-        for file in args['<files>']:
+        marker = ['o','s','^','*']
+        for ifile, file in enumerate(args['<files>']):
             data_set = read_scaling_run(file)
             n_res = len(data_set)
             for i_res, res in enumerate(natural_sort(data_set.keys(), reverse=True)):
                 zorder = (n_res-i_res-1)/n_res+zorder_base
                 print('plotting run: {:} at layer {:.2f}'.format(res, zorder))
-                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'], zorder=zorder, spread=args['--spread'])
+                plot_scaling_run(data_set[res], ax_set, clean_plot=args['--clean_plot'], zorder=zorder, spread=args['--spread'], marker=marker[ifile])
+            for ax in ax_set:
+                ax.set_prop_cycle(None)
         finalize_plots(fig_set, ax_set)
