@@ -421,6 +421,9 @@ def plot_scaling_run(data_set, ax_set,
     ax_set[3].plot(N_total_cpu, startup_time, label=label_string,
                    marker=marker,  linestyle='none', color=color, zorder=zorder)
 
+    ax_set[4].plot(N_total_cpu, 1/DOF_cyles_per_cpusec, label=label_string,
+                   marker=marker, linestyle='none', color=color, alpha=0.5, zorder=zorder)
+
     if ideal_curves:
         ideal_cores = np.sort(N_total_cpu)
         i_min = np.argmin(N_total_cpu)
@@ -433,10 +436,12 @@ def plot_scaling_run(data_set, ax_set,
         ax_set[1].set_ylim(bottom=ylim_0)
         #ax_set[1].set_ylim(emit=True)
 
-    for i in range(4):
+    for i in range(5):
         ax_set[i].set_xscale('log', base=2)
         ax_set[i].set_yscale('log')
         ax_set[i].margins(x=0.05, y=0.05)
+    ax_set[4].set_xscale('log')
+    ax_set[4].margins(x=0.05, y=0.05)
 
 
 def initialize_plots(num_figs, fontsize=12):
@@ -538,6 +543,12 @@ def finalize_plots(fig_set, ax_set):
     plt.tight_layout()
     fig_set[3].savefig('scaling_startup.pdf')
 
+    ax_set[4].set_xlabel('N-core')
+    ax_set[4].set_ylabel('1/speed')
+    ax_set[4].legend(loc='upper left')
+    plt.tight_layout()
+    fig_set[4].savefig('scaling_latency.pdf')
+
 if __name__ == "__main__":
 
     from docopt import docopt
@@ -591,7 +602,7 @@ if __name__ == "__main__":
         if not output_path.exists():
             output_path.mkdir()
         # Plot
-        fig_set, ax_set = initialize_plots(4)
+        fig_set, ax_set = initialize_plots(5)
         zorder_base = 2
         marker = ['o','s','^','*']
         for ifile, file in enumerate(args['<files>']):
