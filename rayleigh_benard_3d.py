@@ -71,9 +71,9 @@ dist = d3.Distributor(coords, mesh=mesh, dtype=dtype)
 xbasis = d3.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
 ybasis = d3.RealFourier(coords['y'], size=ny, bounds=(0, Ly), dealias=dealias)
 zbasis = d3.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
-x = xbasis.local_grid(1)
-y = ybasis.local_grid(1)
-z = zbasis.local_grid(1)
+x = dist.local_grid(xbasis)
+y = dist.local_grid(ybasis)
+z = dist.local_grid(zbasis)
 ba = (xbasis,ybasis,zbasis)
 ba_p = (xbasis,ybasis)
 
@@ -99,8 +99,8 @@ ez1 = dist.VectorField(coords, name='ez', bases=zb1)
 ez['g'][2] = 1
 ez1['g'][2] = 1
 
-lift1 = lambda A, n: d3.LiftTau(A, zb1, n)
-lift = lambda A, n: d3.LiftTau(A, zb2, n)
+lift1 = lambda A, n: d3.Lift(A, zb1, n)
+lift = lambda A, n: d3.Lift(A, zb2, n)
 
 integ = lambda A: d3.Integrate(d3.Integrate(d3.Integrate(A, 'x'),'y'),'z')
 

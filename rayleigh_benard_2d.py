@@ -63,8 +63,8 @@ coords = d3.CartesianCoordinates('x', 'z')
 dist = d3.Distributor(coords, dtype=dtype)
 xbasis = d3.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
 zbasis = d3.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
-x = xbasis.local_grid(1)
-z = zbasis.local_grid(1)
+x = dist.local_grid(xbasis)
+z = dist.local_grid(zbasis)
 
 ba = (xbasis,zbasis)
 ba_p = (xbasis)
@@ -104,17 +104,17 @@ ez2['g'][1] = 1
 
 ezg = grid(ez).evaluate()
 
-lift = lambda A, n: d3.LiftTau(A, zb2, n)
-lift1 = lambda A, n: d3.LiftTau(A, zb1, n)
+lift = lambda A, n: d3.Lift(A, zb2, n)
+lift1 = lambda A, n: d3.Lift(A, zb1, n)
 
 b0 = dist.Field(name='b0', bases=zbasis)
 b0['g'] = Lz - z
 
 # Problem
 problem = d3.IVP([p, b, u, τp, τ1b, τ2b, τ1u, τ2u], namespace=locals())
-problem.add_equation("div(u) + dot(lift1(τ2u,-1),ez1) + τp = 0")
+problem.add_equation("div(u) + lift1(τ2u,-1)@ez1 + τp = 0")
 problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift(τ2u,-2) + lift(τ1u,-1) - b*ez2 = -skew(grid(u))*div(skew(u))")
-problem.add_equation("dt(b) + dot(u, grad(b0)) - kappa*lap(b) + lift(τ2b,-2) + lift(τ1b,-1) = - dot(u,grad(b))")
+problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift(τ2b,-2) + lift(τ1b,-1) = - (u@grad(b))")
 problem.add_equation("b(z=0) = 0")
 problem.add_equation("u(z=0) = 0")
 problem.add_equation("b(z=Lz) = 0")
