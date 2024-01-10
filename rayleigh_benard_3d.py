@@ -129,7 +129,7 @@ problem.add_equation("dot(ey,u)(z=Lz) = 0", condition="nx == 0 and ny == 0")
 problem.add_equation("p(z=Lz) = 0", condition="nx == 0 and ny == 0") # Pressure gauge
 
 # Solver
-solver = problem.build_solver(timestepper)
+solver = problem.build_solver(timestepper, profile=True)
 solver.stop_sim_time = stop_sim_time
 solver.stop_iteration = int(float(args['--niter']))
 
