@@ -122,7 +122,7 @@ problem.add_equation("u(z=Lz) = 0")
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
 # Solver
-solver = problem.build_solver(timestepper, profile=True)
+solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
 solver.stop_iteration = stop_iter
 
