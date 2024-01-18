@@ -87,60 +87,49 @@ def plot_per_core_performance(stats_pdf_dict,
     fig_stacked = plt.figure(figsize=[8,8/2])
     ax_stacked = fig_stacked.add_subplot(1,1,1)
 
-    i_mpi_list = []
-    i_fftw_list = []
-    i_fft_list = []
-    fft_type_list = ["ifft", "_dct", "rfft"]
-    exclude_list = ["load_dynamic", "__init__", "<frozen", "importlib"]
-    i_gssv = None
+    group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
+             'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
+             'FFT':["ifft", "_dct", "rfft", "unpack_rescale", "repack_rescale", "forward", "backward"],
+             'arithmetic':["(operate)", "einsum"],
+             'copy':["copyto", "gather_inputs", "gather_outputs", "scatter_inputs", "scatter_outputs"],
+             'exclude': ["load_dynamic", "__init__", "<frozen", "importlib"]}
+
+    group_indices = {}
+    for key in group:
+        group_indices[key] = []
+    group_indices['other'] = []
+
     for i_sort, (func, data_list) in enumerate(sorted_list):
         if i_sort+1 == N_profiles:
             break
 
-        if ("gssv" or "apply_sparse" or "superlu") in func[2].lower():
-            if verbose:
-                print("found sparse solve call:",func[2], " at ", i_sort)
-            i_gssv = i_sort
-
-        if "mpi4py.MPI" in func[2]:
-            if verbose:
-                print("found MPI call:",func[2], " at ", i_sort)
-            i_mpi_list.append(i_sort)
-
-    # bubble sparse solve to the top
-    if i_gssv:
-        sorted_list.insert(0,sorted_list.pop(i_gssv))
-    last_insert = 0
-    # insert MPI calls next
-    for i_resort in i_mpi_list:
-            sorted_list.insert(last_insert+1,sorted_list.pop(i_resort))
-            if verbose:
-                print("moved entry {:d}->{:d}".format(i_resort, last_insert+1))
-            last_insert += 1
-
-    for i_sort, (func, data_list) in enumerate(sorted_list):
-        if "fftw.fftw_wrappers.Transpose" in func[2]:
-            if verbose:
-                print("found fftw transpose call:",func[2], " at ", i_sort)
-            sorted_list.insert(last_insert+1,sorted_list.pop(i_sort))
-            if verbose:
-                print("moved entry {:d}->{:d}".format(i_sort, last_insert+1))
-            last_insert += 1
-
-    for i_sort, (func, data_list) in enumerate(sorted_list):
-        if any(fft_type in func[2] for fft_type in fft_type_list):
-            if verbose:
-                print("found fft call:",func[2], " at ", i_sort)
-            if i_sort < N_profiles:
-                sorted_list.insert(last_insert+1,sorted_list.pop(i_sort))
+        found_category = False
+        for key in group:
+            data = np.array(data_list)
+            if any(item.lower() in func[2].lower() for item in group[key]) and test_criteria(data)/total_time > thresh:
                 if verbose:
-                    print("moved entry {:d}->{:d}".format(i_sort, last_insert+1))
-                last_insert += 1
+                    print(f"found {key:s} call: {func[2]} at {i_sort:d}")
+                group_indices[key].append(i_sort)
+                found_category = True
+        if not found_category:
+            data = np.array(data_list)
+            if test_criteria(data)/total_time > thresh :
+                group_indices['other'].append(i_sort)
+
+    print(group_indices)
+    # bubble sparse solve to the top
+    last_insert = 0
+    for key in group_indices:
+        for i_resort in group_indices[key]:
+            sorted_list.insert(last_insert,sorted_list.pop(i_resort))
+            if verbose:
+                print("moved entry {:d}->{:d}".format(i_resort, last_insert))
+            last_insert += 1
 
     for i_sort, (func, data_list) in enumerate(sorted_list):
         if i_sort+1 == N_profiles:
             break
-        if any((exclude_type in func[0] or exclude_type in func[2]) for exclude_type in exclude_list):
+        if any((exclude_type in func[0] or exclude_type in func[2]) for exclude_type in group['exclude']):
             if verbose:
                 print("found excluded call:",func[2], " at ", i_sort, " ... popping.")
             sorted_list.pop(i_sort)
