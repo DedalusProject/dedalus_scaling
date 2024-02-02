@@ -8,13 +8,16 @@ Options:
     --profile=<profile>    Profile data to plot (e.g., runtime, setup, warmup) [default: runtime]
     --thresh=<thresh>      Theshold for trimming output, as a fraction of total time [default: 0.02]
 
+    --directory=<dir>      Location of profile data [default: profiles]
+
     --verbose              Display text verbose output to screen
 
 """
 import os
-import shelve
 import pstats
 import numpy as np
+import pathlib
+import pickle
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -281,13 +284,13 @@ def plot_per_core_performance(stats_pdf_dict,
     # plt.close(fig_key)
 
 def read_database(file):
-    from contextlib import closing
+    with (open(file, "rb")) as f:
+        data = pickle.load(f)
 
-    with closing(shelve.open(file, flag='r')) as shelf:
-        primcalls = shelf['primcalls']
-        totcalls = shelf['totcalls']
-        tottime = shelf['tottime']
-        cumtime = shelf['cumtime']
+    primcalls = data['primcalls']
+    totcalls = data['totcalls']
+    tottime = data['tottime']
+    cumtime = data['cumtime']
 
     #average_runtime = shelf['average_runtime']
     #n_processes = shelf['n_processes']
@@ -299,12 +302,14 @@ if __name__ == "__main__":
     from docopt import docopt
     args = docopt(__doc__)
 
-    joint_file = args['--profile']+'.prof'
-    profiles_file = args['--profile']+'_profiles'
+    dir = pathlib.Path(args['--directory'])
 
-    summed_stats = pstats.Stats(joint_file)
+    joint_file = str(args['--profile'])+'.prof'
+    profiles_file = str(args['--profile'])+'_parallel.pickle'
 
-    primcalls, totcalls, tottime, cumtime = read_database(profiles_file)
+    summed_stats = pstats.Stats(str(dir / joint_file))
+
+    primcalls, totcalls, tottime, cumtime = read_database(dir / profiles_file)
 
     # per-core plots
     plot_per_core_performance(tottime, label="tt", thresh=float(args['--thresh']), verbose=args['--verbose'])
