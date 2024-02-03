@@ -74,6 +74,7 @@ def plot_per_core_performance(stats_pdf_dict,
                               thresh=0.02, verbose=False):
 
     cmap = mpl.colormaps['tab20']
+    cmap_group = mpl.colormaps['tab10']
     #set_plot_defaults(rcParams)
 
     sorted_list = sort_by_total(stats_pdf_dict)
@@ -90,6 +91,9 @@ def plot_per_core_performance(stats_pdf_dict,
     fig_stacked = plt.figure(figsize=[8,8/2])
     ax_stacked = fig_stacked.add_subplot(1,1,1)
 
+    fig_group = plt.figure(figsize=[8,8/2])
+    ax_group = fig_group.add_subplot(1,1,1)
+
     group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
                   'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
                   'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
@@ -100,12 +104,12 @@ def plot_per_core_performance(stats_pdf_dict,
     group_data = {key:{} for key in group}
     group_data['other'] = {}
 
-    N_profiles = 10
+    N_cores = 0
+
     for i_sort, (func, data) in enumerate(sorted_list):
         if i_sort+1 == N_profiles:
             break
         #print(i_sort, func, data)
-        print('='*40)
         found_category = False
         data = np.array(data)
         for key in group:
@@ -117,9 +121,10 @@ def plot_per_core_performance(stats_pdf_dict,
                 found_category = True
         if not found_category and test_criteria(data)/total_time > thresh:
              group_data['other'][func] = data
+        N_cores = max(N_cores, data.size)
 
     for key in group_data:
-        print(key, ':', group_data[key])
+        print(key, ':', group_data[key].keys())
 
     if verbose:
         for func in group_data['exclude']:
@@ -127,116 +132,109 @@ def plot_per_core_performance(stats_pdf_dict,
     excluded = group_data.pop('exclude', None)
     if verbose: print(excluded)
 
-
     routine_text = "top {:d} routines for {:s}".format(N_profiles, label)
     if verbose:
         print()
         print("{:80s}".format(routine_text),"     min      mean       max   (mean%total)   (m%t cum.)")
         print(120*"-")
 
+    def percent_time(sub_time):
+        sub_string = "{:4.2f}%".format(100*sub_time/total_time)
+        return sub_string
 
-    ### working above here, below is To-Do ###
-    running=0
-    last_insert=0
-    for i_fig, (func, data_list) in enumerate(sorted_list):
-        data = np.array(data_list)
-        N_data = data.shape[0]
-        # if i_fig == N_profiles:
-        #     break
-        # if test_criteria(data)/total_time < thresh:
-        #     break
-        if i_fig+1 == N_profiles or (i_fig > last_insert and test_criteria(data)/total_time < thresh):
-            break
+    if N_cores > 200:
+        N_bins = 100
+        logscale = True
+    else:
+        N_bins = int(N_cores/4)
+        if N_bins == 0 : N_bins = 1
+        logscale = False
+    i_fig = 0
+    running = 0
+    previous_group_data = np.zeros(N_cores)
+    previous_data = np.zeros(N_cores)
 
-        if i_fig == 0:
-            previous_data = np.zeros_like(data)
-
-        N_missing = previous_data.size - data.size
-
-        if N_missing != 0:
-            if verbose:
-                print("missing {:d} values; setting to zero".format(N_missing))
-            for i in range(N_missing):
-                data_list.insert(N_missing*(i+1)-1, 0)
+    for i_group, key in enumerate(group_data):
+        group_time = np.zeros(N_cores)
+        for func, data_list in group_data[key].items():
             data = np.array(data_list)
-            N_data = data.shape[0]
+            N_missing = previous_data.size - data.size
 
-        if func[0] == '~':
-            title_string = func[2]
-        else:
-            title_string = "{:s}:{:d}:{:s}".format(*func)
+            if N_missing != 0:
+                if verbose:
+                    print("missing {:d} values; setting to zero".format(N_missing))
+                for i in range(N_missing):
+                    data_list.insert(N_missing*(i+1)-1, 0)
+                data = np.array(data_list)
 
-        def percent_time(sub_time):
-            sub_string = "{:4.2f}%".format(100*sub_time/total_time)
-            return sub_string
+            group_time += data
 
-        running += np.mean(data)
-        timing_data_string = "{:8.2g} |{:8.2g} |{:8.2g}  ({:s}) ({:s})".format(np.min(data), np.mean(data), np.max(data), percent_time(np.mean(data)), percent_time(running))
+            if func[0] == '~':
+                title_string = func[2]
+            else:
+                title_string = "{:s}:{:d}:{:s}".format(*func)
 
-        if verbose:
-            print("{:80s} = {:s}".format(title_string, timing_data_string))
+            running += np.mean(data)
+            timing_data_string = "{:8.2g} |{:8.2g} |{:8.2g}  ({:s}) ({:s})".format(np.min(data), np.mean(data), np.max(data), percent_time(np.mean(data)), percent_time(running))
 
-        timing_data_string = "min {:s} | {:s} | {:s} max".format(percent_time(np.min(data)), percent_time(np.mean(data)), percent_time(np.max(data)))
+            if verbose:
+                print("{:80s} = {:s}".format(title_string, timing_data_string))
 
-        title_string += "\n{:s}".format(timing_data_string)
+            timing_data_string = "min {:s} | {:s} | {:s} max".format(percent_time(np.min(data)), percent_time(np.mean(data)), percent_time(np.max(data)))
 
-        key_label = "{:s} {:s}".format(percent_time(np.mean(data)),func[2])
-        short_label = "{:s}".format(percent_time(np.mean(data)))
+            title_string += "\n{:s}".format(timing_data_string)
 
-        composite_data_set.append([data])
-        composite_label.append(short_label)
-        composite_key_label.append(key_label)
+            key_label = "{:s} {:s}".format(percent_time(np.mean(data)),func[2])
+            short_label = "{:s}".format(percent_time(np.mean(data)))
 
+            composite_data_set.append([data])
+            composite_label.append(short_label)
+            composite_key_label.append(key_label)
 
-        if N_data > 200:
-            N_bins = 100
-            logscale = True
-        else:
-            N_bins = int(N_data/4)
-            if N_bins == 0 : N_bins = 1
-            logscale = False
+            q_color = cmap(i_fig) #next(ax_stacked._get_lines.prop_cycler)['color']
 
-        q_color = cmap(i_fig) #next(ax_stacked._get_lines.prop_cycler)['color']
+            fig = plt.figure(figsize=[8,8/2])
 
-        fig = plt.figure(figsize=[8,8/2])
+            # pdf plot over many cores
+            ax1 = fig.add_subplot(1,2,1)
 
-        # pdf plot over many cores
-        ax1 = fig.add_subplot(1,2,1)
-
-        #hist_values, bin_edges = np.histogram(data, bins=N_bins)
-        #ax1.barh(hist_values, bin_edges[1:])
-        ax1.hist(data, bins=N_bins, orientation='horizontal', log=logscale, linewidth=0, color=q_color)
-        ax1.set_xlabel("N cores/bin")
-        ax1.set_ylabel("time (sec)")
-        ax1.grid(axis = 'x', color ='white', linestyle='-')
+            #hist_values, bin_edges = np.histogram(data, bins=N_bins)
+            #ax1.barh(hist_values, bin_edges[1:])
+            ax1.hist(data, bins=N_bins, orientation='horizontal', log=logscale, linewidth=0, color=q_color)
+            ax1.set_xlabel("N cores/bin")
+            ax1.set_ylabel("time (sec)")
+            ax1.grid(axis = 'x', color ='white', linestyle='-')
 
 
-        # bar plot for each core
-        ax2 = fig.add_subplot(1,2,2)
-        ax2.bar(np.arange(N_data), data, linewidth=0, width=1, color=q_color)
-        ax2.set_xlim(-0.5, N_data+0.5)
-        ax2.set_xlabel("core #")
-        clean_display(ax2)
+            # bar plot for each core
+            ax2 = fig.add_subplot(1,2,2)
+            ax2.bar(np.arange(N_cores)+1, data, linewidth=0, width=1, color=q_color)
+            ax2.set_xlim(0.5, N_cores+0.5)
+            ax2.set_xlabel("core #")
+            clean_display(ax2)
 
-        ax2.grid(axis = 'y', color ='white', linestyle='-')
+            ax2.grid(axis = 'y', color ='white', linestyle='-')
 
-        # end include
+            # end include
 
-        ax1.set_ylim(0, 1.1*np.max(data))
-        ax2.set_ylim(0, 1.1*np.max(data))
+            ax1.set_ylim(0, 1.1*np.max(data))
+            ax2.set_ylim(0, 1.1*np.max(data))
 
+            fig.suptitle(title_string)
+            fig.tight_layout()
+            fig.savefig(label+'_{:06d}.png'.format(i_fig+1), dpi=200)
+            plt.close(fig)
 
-        fig.suptitle(title_string)
-        fig.tight_layout()
-        fig.savefig(label+'_{:06d}.png'.format(i_fig+1), dpi=200)
-        plt.close(fig)
-
-        ax_stacked.bar(np.arange(N_data), data, bottom=previous_data, label=short_label, linewidth=0,
-                       width=1, color=q_color)
-        previous_data += data
+            ax_stacked.bar(np.arange(N_cores)+1, data, bottom=previous_data, label=short_label, linewidth=0,
+                           width=1, color=q_color)
+            previous_data += data
+            i_fig += 1
+        ax_group.bar(np.arange(N_cores)+1, group_time, bottom=previous_group_data, label=key, linewidth=0,
+                       width=1, color=cmap_group(i_group))
+        previous_group_data += group_time
 
     clean_display(ax_stacked)
-    ax_stacked.set_xlim(-0.5, N_data+0.5)
+    ax_stacked.set_xlim(0.5, N_cores+0.5)
     ax_stacked.set_xlabel('core #')
     ax_stacked.set_ylabel('total time (sec)')
     #ax_stacked.legend(loc='upper left', bbox_to_anchor=(1.,1.), fontsize=10)
@@ -247,8 +245,23 @@ def plot_per_core_performance(stats_pdf_dict,
     fig_x_size = 8
 
     fig_stacked.tight_layout()
-    fig_stacked.savefig(label+"_per_core_timings.png", dpi=max(200, N_data*points_per_data/fig_x_size))
+    fig_stacked.savefig(label+"_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
     plt.close(fig_stacked)
+
+    clean_display(ax_group)
+    ax_group.legend()
+    ax_group.set_xlim(0.5, N_cores+0.5)
+    ax_group.set_xlabel('core #')
+    ax_group.set_ylabel('total time (sec)')
+    #ax_stacked.legend(loc='upper left', bbox_to_anchor=(1.,1.), fontsize=10)
+    ax_group.set_title("per core timings for groups, routines above {:g}% total time".format(thresh*100))
+    ax_group.grid(axis = 'y', color ='white', linestyle='-')
+    fig_group.tight_layout()
+    fig_group.savefig(label+"_group_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
+    plt.close(fig_group)
+
+
+
 
 
     # pdf plot over many cores
