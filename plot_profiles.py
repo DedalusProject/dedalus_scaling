@@ -91,51 +91,41 @@ def plot_per_core_performance(stats_pdf_dict,
     ax_stacked = fig_stacked.add_subplot(1,1,1)
 
     group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
-             'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
-             'FFT':["ifft", "_dct", "rfft", "unpack_rescale", "repack_rescale", "forward", "backward"],
-             'arithmetic':["(operate)", "einsum"],
-             'copy':["copyto", "gather_inputs", "gather_outputs", "scatter_inputs", "scatter_outputs"],
-             'exclude': ["load_dynamic", "__init__", "<frozen", "importlib"]}
+                  'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
+                  'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
+                  'arithmetic':["(operate)", "einsum"],
+                  'copy':["copyto", "gather_inputs", "gather_outputs", 'scatter_inputs', "scatter_outputs"],
+                  'exclude': ["load_dynamic", "__init__", "<frozen", 'importlib']}
 
-    group_indices = {}
-    for key in group:
-        group_indices[key] = []
-    group_indices['other'] = []
+    group_data = {key:{} for key in group}
+    group_data['other'] = {}
 
-    for i_sort, (func, data_list) in enumerate(sorted_list):
+    N_profiles = 10
+    for i_sort, (func, data) in enumerate(sorted_list):
         if i_sort+1 == N_profiles:
             break
-
+        #print(i_sort, func, data)
+        print('='*40)
         found_category = False
+        data = np.array(data)
         for key in group:
-            data = np.array(data_list)
-            if any(item.lower() in func[2].lower() for item in group[key]) and test_criteria(data)/total_time > thresh:
+            tests = [item.lower() for item in group[key]]
+            if any(item.lower() in func[2].lower() for item in group[key]): #and test_criteria(data)/total_time > thresh:
                 if verbose:
-                    print(f"found {key:s} call: {func[2]} at {i_sort:d}")
-                group_indices[key].append(i_sort)
+                    print(f"found {key:s} call: {func[2]} in {tests} at {i_sort:d}")
+                group_data[key][func] = data
                 found_category = True
-        if not found_category:
-            data = np.array(data_list)
-            if test_criteria(data)/total_time > thresh :
-                group_indices['other'].append(i_sort)
+        if not found_category and test_criteria(data)/total_time > thresh:
+             group_data['other'][func] = data
 
-    print(group_indices)
-    # bubble sparse solve to the top
-    last_insert = 0
-    for key in group_indices:
-        for i_resort in group_indices[key]:
-            sorted_list.insert(last_insert,sorted_list.pop(i_resort))
-            if verbose:
-                print("moved entry {:d}->{:d}".format(i_resort, last_insert))
-            last_insert += 1
+    for key in group_data:
+        print(key, ':', group_data[key])
 
-    for i_sort, (func, data_list) in enumerate(sorted_list):
-        if i_sort+1 == N_profiles:
-            break
-        if any((exclude_type in func[0] or exclude_type in func[2]) for exclude_type in group['exclude']):
-            if verbose:
-                print("found excluded call:",func[2], " at ", i_sort, " ... popping.")
-            sorted_list.pop(i_sort)
+    if verbose:
+        for func in group_data['exclude']:
+            print(f"found excluded call: {func[2]}, popping...")
+    excluded = group_data.pop('exclude', None)
+    if verbose: print(excluded)
 
 
     routine_text = "top {:d} routines for {:s}".format(N_profiles, label)
@@ -143,7 +133,11 @@ def plot_per_core_performance(stats_pdf_dict,
         print()
         print("{:80s}".format(routine_text),"     min      mean       max   (mean%total)   (m%t cum.)")
         print(120*"-")
+
+
+    ### working above here, below is To-Do ###
     running=0
+    last_insert=0
     for i_fig, (func, data_list) in enumerate(sorted_list):
         data = np.array(data_list)
         N_data = data.shape[0]
