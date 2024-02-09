@@ -5,46 +5,48 @@ Usage:
     rayleigh_benard_3d.py [options]
 
 Options:
-    --nx=<nx>              Horizontal modes; default is 2x nz
-    --ny=<ny>              Horizontal modes; default is 2x nz
+    --nx=<nx>              Horizontal modes; default is aspect x nz
+    --ny=<ny>              Horizontal modes; default is aspect x nz
     --nz=<nz>              Vertical modes   [default: 64]
+
+    --aspect=<aspect>      Aspect ratio of domain [default: 4]
+
+    --Rayleigh=<Rayleigh>  Rayleigh number [default: 1e6]
 
     --niter=<iter>         Timing iterations [default: 100]
     --nstart=<nstart>      Startup iterations [default: 10]
 
-    --dealias=<dealias>         Dealiasing [default: 1.5]
+    --dealias=<dealias>    Dealiasing [default: 1.5]
 
-    --mesh=<mesh>               Parallel decomposition mesh
+    --mesh=<mesh>          Parallel decomposition mesh
 """
 from mpi4py import MPI
 import numpy as np
 import time
-import dedalus.public as d3
+import dedalus.public as de
 import logging
 logger = logging.getLogger(__name__)
 
 from docopt import docopt
 args = docopt(__doc__)
 
-# TODO: maybe fix plotting to directly handle vectors
-# TODO: optimize and match d2 resolution
-# TODO: get unit vectors from coords?
-
 comm = MPI.COMM_WORLD
 rank = comm.rank
 ncpu = comm.size
 
 # Parameters
-Lx, Ly, Lz = 4, 4, 1
+aspect = float(args['--aspect'])
+# Parameters
+Lx, Ly, Lz = aspect, aspect, 1
 nz = int(args['--nz'])
 if args['--nx']:
     nx = int(args['--nx'])
 else:
-    nx = 2*nz
+    nx = int(aspect*nz)
 if args['--ny']:
     ny = int(args['--ny'])
 else:
-    ny = 2*nz
+    ny = int(aspect*nz)
 
 mesh = args['--mesh']
 if mesh is not None:
@@ -57,20 +59,20 @@ else:
 logger.info("running on processor mesh={}".format(mesh))
 
 
-Rayleigh = 1e6
+Rayleigh = float(args['--Rayleigh'])
 Prandtl = 1
 dealias = float(args['--dealias'])
 stop_sim_time = np.inf
-timestepper = d3.SBDF2 #RK222
+timestepper = de.SBDF2
 max_timestep = 1e-3
 dtype = np.float64
 
 # Bases
-coords = d3.CartesianCoordinates('x', 'y', 'z')
-dist = d3.Distributor(coords, mesh=mesh, dtype=dtype)
-xbasis = d3.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
-ybasis = d3.RealFourier(coords['y'], size=ny, bounds=(0, Ly), dealias=dealias)
-zbasis = d3.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
+coords = de.CartesianCoordinates('x', 'y', 'z')
+dist = de.Distributor(coords, mesh=mesh, dtype=dtype)
+xbasis = de.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
+ybasis = de.RealFourier(coords['y'], size=ny, bounds=(0, Ly), dealias=dealias)
+zbasis = de.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
 x = dist.local_grid(xbasis)
 y = dist.local_grid(ybasis)
 z = dist.local_grid(zbasis)
@@ -82,72 +84,61 @@ p = dist.Field(name='p', bases=ba)
 b = dist.Field(name='b', bases=ba)
 u = dist.VectorField(coords, name='u', bases=ba)
 τp = dist.Field(name='τp')
-τ1b = dist.Field(name='τ1b', bases=ba_p)
-τ2b = dist.Field(name='τ2b', bases=ba_p)
-τ1u = dist.VectorField(coords, name='τ1u', bases=ba_p)
-τ2u = dist.VectorField(coords, name='τ2u', bases=ba_p)
+τb1 = dist.Field(name='τb1', bases=ba_p)
+τb2 = dist.Field(name='τb2', bases=ba_p)
+τu1 = dist.VectorField(coords, name='τu1', bases=ba_p)
+τu2 = dist.VectorField(coords, name='τu2', bases=ba_p)
 
 # Substitutions
 kappa = (Rayleigh * Prandtl)**(-1/2)
 nu = (Rayleigh / Prandtl)**(-1/2)
 
-zb1 = zbasis.clone_with(a=zbasis.a+1, b=zbasis.b+1)
-zb2 = zbasis.clone_with(a=zbasis.a+2, b=zbasis.b+2)
+ey, ex, ez = coords.unit_vector_fields(dist)
 
-ez = dist.VectorField(coords, name='ez', bases=zb2)
-ez1 = dist.VectorField(coords, name='ez', bases=zb1)
-ez['g'][2] = 1
-ez1['g'][2] = 1
+lift_basis = zbasis.derivative_basis(1)
+lift = lambda A: de.Lift(A, lift_basis, -1)
 
-lift1 = lambda A, n: d3.Lift(A, zb1, n)
-lift = lambda A, n: d3.Lift(A, zb2, n)
-
-integ = lambda A: d3.Integrate(d3.Integrate(d3.Integrate(A, 'x'),'y'),'z')
+lift_basis2 = zbasis.derivative_basis(2)
+lift2 = lambda A: de.Lift(A, lift_basis2, -1)
+lift2_2 = lambda A: de.Lift(A, lift_basis2, -2)
 
 b0 = dist.Field(name='b0', bases=zbasis)
 b0['g'] = Lz - z
 
-dot = lambda A, B: d3.DotProduct(A, B)
-
-ex = dist.VectorField(coords, name='ex')
-ey = dist.VectorField(coords, name='ey')
-ex['g'][0] = 1
-ey['g'][1] = 1
-
 # Problem
-problem = d3.IVP([p, b, u, τ1b, τ2b, τ1u, τ2u], namespace=locals())
-problem.add_equation("div(u) + dot(lift1(τ2u,-1),ez1) = 0")
-problem.add_equation("dt(b) + dot(u, grad(b0)) - kappa*lap(b) + lift(τ2b,-2) + lift(τ1b,-1) = - dot(u,grad(b))")
+problem = de.IVP([p, u, b, τp, τu1, τu2, τb1, τb2], namespace=locals())
+problem.add_equation("div(u) + lift(τp) = 0")
 # TODO: go to cross(u, curl(u)) form of momentum nonlinearity
-problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift(τ2u,-2) + lift(τ1u,-1) - b*ez = -dot(u,grad(u))") #cross(u, curl(u))")
+problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift2_2(τu1) + lift2(τu2) - b*ez = -(u@grad(u))") #cross(u, curl(u))")
+problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift2_2(τb1) + lift2(τb2) = - (u@grad(b))")
 problem.add_equation("b(z=0) = 0")
-problem.add_equation("u(z=0) = 0")
+problem.add_equation("u(z=0) = 0", condition="nx != 0 or ny != 0")
+problem.add_equation("p(z=0) = 0", condition="nx == 0 and ny == 0") # Pressure gauge
+problem.add_equation("ex@(u)(z=0) = 0", condition="nx == 0 and ny == 0")
+problem.add_equation("ey@(u)(z=0) = 0", condition="nx == 0 and ny == 0")
+problem.add_equation("ez@τu1 = 0", condition="nx == 0 and ny == 0")
 problem.add_equation("b(z=Lz) = 0")
-problem.add_equation("u(z=Lz) = 0", condition="nx != 0 or ny != 0")
-problem.add_equation("dot(ex,u)(z=Lz) = 0", condition="nx == 0 and ny == 0")
-problem.add_equation("dot(ey,u)(z=Lz) = 0", condition="nx == 0 and ny == 0")
-problem.add_equation("p(z=Lz) = 0", condition="nx == 0 and ny == 0") # Pressure gauge
+problem.add_equation("u(z=Lz) = 0")
 
 # Solver
-solver = problem.build_solver(timestepper, profile=True)
+solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
-solver.stop_iteration = int(float(args['--niter']))
+solver.stop_iteration = int(float(args['--niter'])) + int(float(args['--nstart']))
 
 # Initial conditions
-zb, zt = zbasis.bounds
-b.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
+b.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
 b['g'] *= z * (Lz - z) # Damp noise at walls
 b.low_pass_filter(scales=0.25)
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.5, threshold=0.1,
+CFL = de.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.5, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
-cadence = 50
+cadence = 100
 # Flow properties
-flow = d3.GlobalFlowProperty(solver, cadence=cadence)
-flow.add_property(np.sqrt(d3.dot(u,u))/nu, name='Re')
+flow = de.GlobalFlowProperty(solver, cadence=cadence)
+flow.add_property(np.sqrt(u@u)/nu, name='Re')
 
 startup_iter = int(float(args['--nstart']))
 # Main loop
