@@ -89,6 +89,9 @@ u = dist.VectorField(coords, name='u', bases=ba)
 τu1 = dist.VectorField(coords, name='τu1', bases=ba_p)
 τu2 = dist.VectorField(coords, name='τu2', bases=ba_p)
 
+curl = lambda A: de.Curl(A)
+ω = curl(u)
+
 # Substitutions
 kappa = (Rayleigh * Prandtl)**(-1/2)
 nu = (Rayleigh / Prandtl)**(-1/2)
@@ -109,7 +112,7 @@ b0['g'] = Lz - z
 problem = de.IVP([p, u, b, τp, τu1, τu2, τb1, τb2], namespace=locals())
 problem.add_equation("div(u) + lift(τp) = 0")
 # TODO: go to cross(u, curl(u)) form of momentum nonlinearity
-problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift2_2(τu1) + lift2(τu2) - b*ez = -(u@grad(u))") #cross(u, curl(u))")
+problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift2_2(τu1) + lift2(τu2) - b*ez = cross(u, ω)")
 problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift2_2(τb1) + lift2(τb2) = - (u@grad(b))")
 problem.add_equation("b(z=0) = 0")
 problem.add_equation("u(z=0) = 0", condition="nx != 0 or ny != 0")
