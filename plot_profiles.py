@@ -99,7 +99,7 @@ def plot_per_core_performance(stats_pdf_dict,
     ax_group = fig_group.add_subplot(1,1,1)
 
     group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
-                  'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
+                  'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose", "increment_plan", "decrement_plan"],
                   'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
                   'arithmetic':["(operate)", "einsum", "arithmetic"],
                   'copy':["copyto", "gather_inputs", "gather_outputs", 'scatter_inputs', "scatter_outputs"],
