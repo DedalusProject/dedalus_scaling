@@ -5,22 +5,21 @@ Usage:
     rayleigh_benard_2d.py [options]
 
 Options:
-    --nx=<nx>              Horizontal modes; default is aspect x Nz
+    --nx=<nx>              Horizontal modes; default is aspect x nz
     --nz=<nz>              Vertical modes [default: 64]
+
     --aspect=<aspect>      Aspect ratio of domain [default: 4]
 
     --Rayleigh=<Rayleigh>  Rayleigh number [default: 1e6]
 
-    --niter=<iter>         How many iterations to run for [default: 110]
+    --niter=<iter>         Timing iterations [default: 100]
     --nstart=<nstart>      Startup iterations [default: 10]
 
-    --label=<label>        Additional label for run output directory
+    --dealias=<dealias>    Dealiasing [default: 1.5]
 """
 from mpi4py import MPI
 import numpy as np
 import time
-import sys
-import os
 
 from docopt import docopt
 args = docopt(__doc__)
@@ -39,20 +38,15 @@ import dedalus.public as de
 import logging
 logger = logging.getLogger(__name__)
 
-# TODO: maybe fix plotting to directly handle vectors
-# TODO: optimize and match d2 resolution
-# TODO: get unit vectors from coords?
-
 comm = MPI.COMM_WORLD
 rank = comm.rank
 ncpu = comm.size
 
 Rayleigh = float(args['--Rayleigh'])
 Prandtl = 1
-dealias = 3/2
+dealias = float(args['--dealias'])
 
 stop_sim_time = np.inf
-stop_iter = int(float(args['--niter']))
 
 timestepper = de.SBDF2
 max_timestep = 1e-3
@@ -78,25 +72,12 @@ u = dist.VectorField(coords, name='u', bases=ba)
 τu1 = dist.VectorField(coords, name='τu1', bases=ba_p)
 τu2 = dist.VectorField(coords, name='τu2', bases=ba_p)
 
-grid = lambda A: de.Grid(A)
-div = lambda A: de.Divergence(A, index=0)
-from dedalus.core.operators import Skew
-skew = lambda A: Skew(A)
-integ = lambda A: de.Integrate(de.Integrate(A, 'x'), 'z')
-avg = lambda A: integ(A)/(Lx*Lz)
-x_avg = lambda A: de.Integrate(A, coords['x'])/(Lx)
-dot = lambda A, B: de.DotProduct(A, B)
-grad = lambda A: de.Gradient(A, coords)
 curl = lambda A: de.Curl(A)
-
 ω = curl(u)
 
 # Substitutions
 kappa = (Rayleigh * Prandtl)**(-1/2)
 nu = (Rayleigh / Prandtl)**(-1/2)
-
-zb1 = zbasis.clone_with(a=zbasis.a+1, b=zbasis.b+1)
-zb2 = zbasis.clone_with(a=zbasis.a+2, b=zbasis.b+2)
 
 ey, ex, ez = coords.unit_vector_fields(dist)
 
@@ -111,23 +92,23 @@ b0 = dist.Field(name='b0', bases=zbasis)
 b0['g'] = Lz - z
 
 # Problem
-problem = de.IVP([p, b, u, τp, τb1, τb2, τu1, τu2], namespace=locals())
+problem = de.IVP([p, u, b, τp, τu1, τu2, τb1, τb2], namespace=locals())
 problem.add_equation("div(u) + lift(τp) = 0")
 problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift2_2(τu1) + lift2(τu2) - b*ez = cross(u, ω)")
 problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift2_2(τb1) + lift2(τb2) = - (u@grad(b))")
 problem.add_equation("u(z=0) = 0", condition="nx!=0")
+problem.add_equation("p(z=0) = 0", condition="nx==0") # Pressure gauge
 problem.add_equation("ex@u(z=0) = 0", condition="nx==0")
 problem.add_equation("ey@u(z=0) = 0", condition="nx==0")
 problem.add_equation("ez@τu1 = 0", condition="nx==0")
 problem.add_equation("b(z=0) = 0")
 problem.add_equation("u(z=Lz) = 0")
 problem.add_equation("b(z=Lz) = 0")
-problem.add_equation("integ(p) = 0") # Pressure gauge
 
 # Solver
 solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
-solver.stop_iteration = stop_iter
+solver.stop_iteration = int(float(args['--niter'])) + int(float(args['--nstart']))
 
 # Initial conditions
 b.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
@@ -142,7 +123,7 @@ CFL.add_velocity(u)
 
 # Flow properties
 flow = de.GlobalFlowProperty(solver, cadence=cadence)
-flow.add_property(np.sqrt(de.dot(u,u))/nu, name='Re')
+flow.add_property(np.sqrt(u@u)/nu, name='Re')
 
 startup_iter = int(float(args['--nstart']))
 # Main loop
