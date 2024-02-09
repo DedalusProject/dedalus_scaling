@@ -6,7 +6,10 @@ Usage:
 
 Options:
     --profile=<profile>    Profile data to plot (e.g., runtime, setup, warmup) [default: runtime]
+
     --thresh=<thresh>      Theshold for trimming output, as a fraction of total time [default: 0.02]
+
+    --max_profiles=<max>   Maximum number of profiles to output [default: 50]
 
     --directory=<dir>      Location of profile data [default: profiles]
 
@@ -71,7 +74,8 @@ def clean_display(ax):
 
 def plot_per_core_performance(stats_pdf_dict,
                               label='', N_profiles=50,
-                              thresh=0.02, verbose=False):
+                              thresh=0.02, verbose=False,
+                              dir=pathlib.Path('.')):
 
     cmap = mpl.colormaps['tab20']
     cmap_group = mpl.colormaps['tab10']
@@ -97,7 +101,7 @@ def plot_per_core_performance(stats_pdf_dict,
     group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
                   'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose"],
                   'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
-                  'arithmetic':["(operate)", "einsum"],
+                  'arithmetic':["(operate)", "einsum", "arithmetic"],
                   'copy':["copyto", "gather_inputs", "gather_outputs", 'scatter_inputs', "scatter_outputs"],
                   'exclude': ["load_dynamic", "__init__", "<frozen", 'importlib']}
 
@@ -114,7 +118,7 @@ def plot_per_core_performance(stats_pdf_dict,
         data = np.array(data)
         for key in group:
             tests = [item.lower() for item in group[key]]
-            if any(item.lower() in func[2].lower() for item in group[key]): #and test_criteria(data)/total_time > thresh:
+            if (any(item.lower() in func[0].lower() for item in group[key]) or any(item.lower() in func[2].lower() for item in group[key])) and test_criteria(data)/total_time > thresh:
                 if verbose:
                     print(f"found {key:s} call: {func[2]} in {tests} at {i_sort:d}")
                 group_data[key][func] = data
@@ -222,7 +226,7 @@ def plot_per_core_performance(stats_pdf_dict,
 
             fig.suptitle(title_string)
             fig.tight_layout()
-            fig.savefig(label+'_{:06d}.png'.format(i_fig+1), dpi=200)
+            fig.savefig(dir / f'{label:s}_{i_fig+1:06d}.png', dpi=200)
             plt.close(fig)
 
             ax_stacked.bar(np.arange(N_cores)+1, data, bottom=previous_data, label=short_label, linewidth=0,
@@ -245,7 +249,7 @@ def plot_per_core_performance(stats_pdf_dict,
     fig_x_size = 8
 
     fig_stacked.tight_layout()
-    fig_stacked.savefig(label+"_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
+    fig_stacked.savefig(dir / f"{label:s}_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
     plt.close(fig_stacked)
 
     clean_display(ax_group)
@@ -257,11 +261,8 @@ def plot_per_core_performance(stats_pdf_dict,
     ax_group.set_title("per core timings for groups, routines above {:g}% total time".format(thresh*100))
     ax_group.grid(axis = 'y', color ='white', linestyle='-')
     fig_group.tight_layout()
-    fig_group.savefig(label+"_group_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
+    fig_group.savefig(dir / f"{label:s}_group_per_core_timings.png", dpi=max(200, N_cores*points_per_data/fig_x_size))
     plt.close(fig_group)
-
-
-
 
 
     # pdf plot over many cores
@@ -319,5 +320,5 @@ if __name__ == "__main__":
     primcalls, totcalls, tottime, cumtime = read_database(dir / profiles_file)
 
     # per-core plots
-    plot_per_core_performance(tottime, label="tt", thresh=float(args['--thresh']), verbose=args['--verbose'])
+    plot_per_core_performance(tottime, label="tt", thresh=float(args['--thresh']), verbose=args['--verbose'], N_profiles=int(float(args['--max_profiles'])), dir=dir)
     # Graphs
