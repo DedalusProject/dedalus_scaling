@@ -11,7 +11,7 @@ Options:
 
     --Rayleigh=<Rayleigh>  Rayleigh number [default: 1e6]
 
-    --niter=<iter>         How many iterations to run for [default: 100]
+    --niter=<iter>         How many iterations to run for [default: 110]
     --nstart=<nstart>      Startup iterations [default: 10]
 
     --label=<label>        Additional label for run output directory
@@ -34,7 +34,7 @@ if args['--nx']:
 else:
     nx = int(aspect*nz)
 
-import dedalus.public as d3
+import dedalus.public as de
 
 import logging
 logger = logging.getLogger(__name__)
@@ -54,15 +54,15 @@ dealias = 3/2
 stop_sim_time = np.inf
 stop_iter = int(float(args['--niter']))
 
-timestepper = d3.SBDF2
+timestepper = de.SBDF2
 max_timestep = 1e-3
 dtype = np.float64
 
 # Bases
-coords = d3.CartesianCoordinates('x', 'y', 'z')
-dist = d3.Distributor(coords, dtype=dtype)
-xbasis = d3.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
-zbasis = d3.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
+coords = de.CartesianCoordinates('y', 'x', 'z', right_handed=False)
+dist = de.Distributor(coords, mesh=[1,ncpu], dtype=dtype)
+xbasis = de.RealFourier(coords['x'], size=nx, bounds=(0, Lx), dealias=dealias)
+zbasis = de.ChebyshevT(coords['z'],  size=nz, bounds=(0, Lz), dealias=dealias)
 x = dist.local_grid(xbasis)
 z = dist.local_grid(zbasis)
 
@@ -73,21 +73,21 @@ p = dist.Field(name='p', bases=ba)
 b = dist.Field(name='b', bases=ba)
 u = dist.VectorField(coords, name='u', bases=ba)
 τp = dist.Field(name='τp')
-τ1b = dist.Field(name='τ1b', bases=ba_p)
-τ2b = dist.Field(name='τ2b', bases=ba_p)
-τ1u = dist.VectorField(coords, name='τ1u', bases=ba_p)
-τ2u = dist.VectorField(coords, name='τ2u', bases=ba_p)
+τb1 = dist.Field(name='τb1', bases=ba_p)
+τb2 = dist.Field(name='τb2', bases=ba_p)
+τu1 = dist.VectorField(coords, name='τu1', bases=ba_p)
+τu2 = dist.VectorField(coords, name='τu2', bases=ba_p)
 
-grid = lambda A: d3.Grid(A)
-div = lambda A: d3.Divergence(A, index=0)
+grid = lambda A: de.Grid(A)
+div = lambda A: de.Divergence(A, index=0)
 from dedalus.core.operators import Skew
 skew = lambda A: Skew(A)
-integ = lambda A: d3.Integrate(d3.Integrate(A, 'x'), 'z')
+integ = lambda A: de.Integrate(de.Integrate(A, 'x'), 'z')
 avg = lambda A: integ(A)/(Lx*Lz)
-x_avg = lambda A: d3.Integrate(A, coords['x'])/(Lx)
-dot = lambda A, B: d3.DotProduct(A, B)
-grad = lambda A: d3.Gradient(A, coords)
-curl = lambda A: d3.Curl(A)
+x_avg = lambda A: de.Integrate(A, coords['x'])/(Lx)
+dot = lambda A, B: de.DotProduct(A, B)
+grad = lambda A: de.Gradient(A, coords)
+curl = lambda A: de.Curl(A)
 
 ω = curl(u)
 
@@ -98,30 +98,30 @@ nu = (Rayleigh / Prandtl)**(-1/2)
 zb1 = zbasis.clone_with(a=zbasis.a+1, b=zbasis.b+1)
 zb2 = zbasis.clone_with(a=zbasis.a+2, b=zbasis.b+2)
 
-ez = dist.VectorField(coords, name='ez', bases=zbasis)
-ez1 = dist.VectorField(coords, name='ez1', bases=zb1)
-ez2 = dist.VectorField(coords, name='ez2', bases=zb2)
-ez['g'][-1] = 1
-ez1['g'][-1] = 1
-ez2['g'][-1] = 1
+ey, ex, ez = coords.unit_vector_fields(dist)
 
-ezg = grid(ez).evaluate()
+lift_basis = zbasis.derivative_basis(1)
+lift = lambda A: de.Lift(A, lift_basis, -1)
 
-lift = lambda A, n: d3.Lift(A, zb2, n)
-lift1 = lambda A, n: d3.Lift(A, zb1, n)
+lift_basis2 = zbasis.derivative_basis(2)
+lift2 = lambda A: de.Lift(A, lift_basis2, -1)
+lift2_2 = lambda A: de.Lift(A, lift_basis2, -2)
 
 b0 = dist.Field(name='b0', bases=zbasis)
 b0['g'] = Lz - z
 
 # Problem
-problem = d3.IVP([p, b, u, τp, τ1b, τ2b, τ1u, τ2u], namespace=locals())
-problem.add_equation("div(u) + lift1(τ2u,-1)@ez1 + τp = 0")
-problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift(τ2u,-2) + lift(τ1u,-1) - b*ez2 = cross(u, ω)")
-problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift(τ2b,-2) + lift(τ1b,-1) = - (u@grad(b))")
+problem = de.IVP([p, b, u, τp, τb1, τb2, τu1, τu2], namespace=locals())
+problem.add_equation("div(u) + lift(τp) = 0")
+problem.add_equation("dt(u) - nu*lap(u) + grad(p) + lift2_2(τu1) + lift2(τu2) - b*ez = cross(u, ω)")
+problem.add_equation("dt(b) + u@grad(b0) - kappa*lap(b) + lift2_2(τb1) + lift2(τb2) = - (u@grad(b))")
+problem.add_equation("u(z=0) = 0", condition="nx!=0")
+problem.add_equation("ex@u(z=0) = 0", condition="nx==0")
+problem.add_equation("ey@u(z=0) = 0", condition="nx==0")
+problem.add_equation("ez@τu1 = 0", condition="nx==0")
 problem.add_equation("b(z=0) = 0")
-problem.add_equation("u(z=0) = 0")
-problem.add_equation("b(z=Lz) = 0")
 problem.add_equation("u(z=Lz) = 0")
+problem.add_equation("b(z=Lz) = 0")
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
 # Solver
@@ -134,15 +134,15 @@ b.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
 b['g'] *= z * (Lz - z) # Damp noise at walls
 b.low_pass_filter(scales=0.25)
 
-cadence = 10
+cadence = 100
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.2, threshold=0.1,
+CFL = de.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.2, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
 # Flow properties
-flow = d3.GlobalFlowProperty(solver, cadence=cadence)
-flow.add_property(np.sqrt(d3.dot(u,u))/nu, name='Re')
+flow = de.GlobalFlowProperty(solver, cadence=cadence)
+flow.add_property(np.sqrt(de.dot(u,u))/nu, name='Re')
 
 startup_iter = int(float(args['--nstart']))
 # Main loop
