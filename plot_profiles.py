@@ -29,18 +29,18 @@ import matplotlib.pyplot as plt
 
 
 def make_graph(profile, output_png_file, node_thresh=0.5):
+    import subprocess as sub
 
-    import subprocess
-
-    proc_graph = subprocess.Popen(["gprof2dot", "--skew", "0.5", "-n", "{:f}".format(node_thresh),
-                                   "-f", "pstats", profile],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
+    proc_graph = sub.Popen([f'python3 -m gprof2dot --skew 0.5 -n  {node_thresh:f} -f pstats {profile}'],
+                                  stdout=sub.PIPE, stderr=sub.PIPE,
+                                  universal_newlines=True,
+                                  shell=True)
 
     # the directed graph is produced by proc_graph.stdout
-    proc_dot = subprocess.Popen(["dot", "-Tpng", "-o", output_png_file],
-                                stdin = proc_graph.stdout,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    proc_dot = sub.Popen([f'dot -Tpng -o {output_png_file}'],
+                                stdin=proc_graph.stdout,
+                                stdout=sub.PIPE, stderr=sub.PIPE, universal_newlines=True,
+                                shell=True)
 
     stdout, stderr = proc_dot.communicate()
 
@@ -127,8 +127,9 @@ def plot_per_core_performance(stats_pdf_dict,
              group_data['other'][func] = data
         N_cores = max(N_cores, data.size)
 
+    N_profiles = 0
     for key in group_data:
-        print(key, ':', group_data[key].keys())
+        N_profiles += len(group_data[key])
 
     if verbose:
         for func in group_data['exclude']:
@@ -139,7 +140,7 @@ def plot_per_core_performance(stats_pdf_dict,
     routine_text = "top {:d} routines for {:s}".format(N_profiles, label)
     if verbose:
         print()
-        print("{:80s}".format(routine_text),"     min      mean       max   (mean%total)   (m%t cum.)")
+        print("{:60s}".format(routine_text),"     min      mean       max   (mean%total)   (m%t cum.)")
         print(120*"-")
 
     def percent_time(sub_time):
@@ -160,6 +161,7 @@ def plot_per_core_performance(stats_pdf_dict,
 
     for i_group, key in enumerate(group_data):
         group_time = np.zeros(N_cores)
+        first_item = True
         for func, data_list in group_data[key].items():
             data = np.array(data_list)
             N_missing = previous_data.size - data.size
@@ -182,7 +184,10 @@ def plot_per_core_performance(stats_pdf_dict,
             timing_data_string = "{:8.2g} |{:8.2g} |{:8.2g}  ({:s}) ({:s})".format(np.min(data), np.mean(data), np.max(data), percent_time(np.mean(data)), percent_time(running))
 
             if verbose:
-                print("{:80s} = {:s}".format(title_string, timing_data_string))
+                if first_item:
+                    print(f'{key:>60s} :')
+                    first_item = False
+                print("{:60s} = {:s}".format(title_string, timing_data_string))
 
             timing_data_string = "min {:s} | {:s} | {:s} max".format(percent_time(np.min(data)), percent_time(np.mean(data)), percent_time(np.max(data)))
 
@@ -322,3 +327,7 @@ if __name__ == "__main__":
     # per-core plots
     plot_per_core_performance(tottime, label="tt", thresh=float(args['--thresh']), verbose=args['--verbose'], N_profiles=int(float(args['--max_profiles'])), dir=dir)
     # Graphs
+
+    make_graph(str(dir / joint_file),
+               str(dir / f'graph_above_{args["--thresh"]}.png'),
+               node_thresh=100*float(args["--thresh"]))
