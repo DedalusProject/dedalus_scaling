@@ -18,7 +18,7 @@ Options:
 """
 from mpi4py import MPI
 import numpy as np
-import dedalus.public as d3
+import dedalus.public as de
 import logging
 logger = logging.getLogger(__name__)
 
@@ -56,22 +56,25 @@ Reynolds = 5e4
 Schmidt = 1
 dealias = float(args['--dealias'])
 stop_iteration = int(float(args['--niter'])) + int(float(args['--nstart']))
-timestepper = d3.RK222
+timestepper = de.RK222
 timestep = 0.001
 dtype = np.float64
 
 # Bases
-coords = d3.CartesianCoordinates('x', 'y', 'z')
-dist = d3.Distributor(coords, dtype=dtype, mesh=mesh)
-xbasis = d3.RealFourier(coords['x'], size=nx, bounds=(0, LL), dealias=dealias)
-ybasis = d3.RealFourier(coords['y'], size=ny, bounds=(0, LL), dealias=dealias)
-zbasis = d3.RealFourier(coords['z'], size=nz, bounds=(0, LL), dealias=dealias)
+coords = de.CartesianCoordinates('x', 'y', 'z')
+dist = de.Distributor(coords, dtype=dtype, mesh=mesh)
+xbasis = de.RealFourier(coords['x'], size=nx, bounds=(0, LL), dealias=dealias)
+ybasis = de.RealFourier(coords['y'], size=ny, bounds=(0, LL), dealias=dealias)
+zbasis = de.RealFourier(coords['z'], size=nz, bounds=(0, LL), dealias=dealias)
 
 # Fields
 p = dist.Field(name='p', bases=(xbasis,ybasis,zbasis))
 s = dist.Field(name='s', bases=(xbasis,ybasis,zbasis))
 u = dist.VectorField(coords, name='u', bases=(xbasis,ybasis,zbasis))
 tau_p = dist.Field(name='tau_p')
+
+curl = lambda A: de.Curl(A)
+ω = curl(u)
 
 # Substitutions
 nu = 1 / Reynolds
@@ -80,9 +83,9 @@ x, y, z = dist.local_grids(xbasis, ybasis, zbasis)
 ex, ey, ez = coords.unit_vector_fields(dist)
 
 # Problem
-problem = d3.IVP([u, s, p, tau_p], namespace=locals())
-problem.add_equation("dt(u) + grad(p) - nu*lap(u) = - u@grad(u)")
-problem.add_equation("dt(s) - D*lap(s) = - u@grad(s)")
+problem = de.IVP([u, s, p, tau_p], namespace=locals())
+problem.add_equation("dt(u) + grad(p) - nu*lap(u) = cross(u, ω)")
+problem.add_equation("dt(s) - D*lap(s) = -(u@grad(s))")
 problem.add_equation("div(u) + tau_p = 0")
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
