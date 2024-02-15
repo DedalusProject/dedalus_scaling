@@ -1,49 +1,42 @@
 # README #
 
-Incompressible Navier-Stokes problem with Taylor-Green forcing using
+Scaling and profiling tools, with associated example problems, for
 the [Dedalus](http://dedalus-project.org) pseudospectral
 framework.  To run these problems, first install
 [Dedalus](http://dedalus-project.org/) (and on
-[bitbucket](https://bitbucket.org/dedalus-project/dedalus)). 
+[github](https://github.com/DedalusProject/dedalus)).
 
-Once [Dedalus](http://dedalus-project.org/) is installed and activated, do the following:
+## Example problems
+Once [Dedalus](http://dedalus-project.org/) is installed and activated, run the triply-periodic shear flow example with:
 ```
 #!bash
-mpiexec_mpt -n 256 python3 incompressible_NS_TG.py --mesh=16,16
+mpirun -n 256 python3 shear_flow_3d.py
 ```
-To obtain sparsity plots of the implicit matrices, use the `--verbose`
-keyword: 
-```
-#!bash
-python3 incompressible_NS_TG.py --verbose --niter=2 --nx=4 --ny=4 --nz=128
-```
-Here we've run a reduced horizontal resolution case so that it can be
-readily completed by a single core.
 
-For scaling tests on NASA/Pleiades:
+The Rayleigh-Benard convection examples can be run using:
 ```
 #!bash
-python3 scaling.py run incompressible_NS_TG.py --3D 128 --min-cores=128 --max-cores=512 --MPISGI
+mpirun -n 256 python3 rayleigh_benard_3d.py
 ```
 
-The following block of code, run on NASA/Pleiades Broadwell nodes (28
-cores/node) using an MPI-SGI stack,
+## Profiling
+If you would like to have detailed profiles of the cython routines, please make sure to set the following envinroment variable:
 ```
 #!bash
-python3 scaling.py run incompressible_NS_TG.py --3D 128 --min-cores=16 --max-cores=2048 --MPISGI --niter=10
-python3 scaling.py run incompressible_NS_TG.py --3D 256 --min-cores=64 --max-cores=2048 --MPISGI --niter=10
-python3 scaling.py run incompressible_NS_TG.py --3D 512 --min-cores=256 --max-cores=2048 --MPISGI --niter=10
-
-python3 scaling.py plot scaling_data_512x512x512.db scaling_data_256x256x256.db scaling_data_128x128x128.db 
+export CYTHON_PROFILE=True
 ```
-recreates this scaling plot:
+before installing [Dedalus](http://dedalus-project.org/).
 
+Detailed profiling requires installation of the `gprof2dot` library:
+```
+#!bash
+pip install gprof2dot
+```
+and the availability of `dot` in the compute environment.
 
-Ideal scaling is indicated by dashed black lines, extrapolated from
-the lowest core count case in all cases.  At each core count, a cloud
-of points are shown sampling a variety of processor mesh
-configurations.  Generally, the configuration of the processor mesh
-has little impact on overall performance.
-
-Contact the exoweather team for more details.
-
+Profiling during runs is controlled in `dedalus.cfg` or at the script level.  When enabled, code profiles are stored by default in the `./profiles` directory.  You can obtain detailed performance data aggregated across cores and on a per-core basis using:
+```
+#!bash
+python3 plot_profiles.py
+```
+which will produce a variety of graphical outputs, stored in `./profiles` as `.png` files.
