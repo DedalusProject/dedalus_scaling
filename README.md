@@ -8,35 +8,30 @@ framework.  To run these problems, first install
 
 ## Example problems
 Once [Dedalus](http://dedalus-project.org/) is installed and activated, run the triply-periodic shear flow example with:
-```
-#!bash
+```bash
 mpirun -n 256 python3 shear_flow_3d.py
 ```
 
 The Rayleigh-Benard convection examples can be run using:
-```
-#!bash
+```bash
 mpirun -n 256 python3 rayleigh_benard_3d.py
 ```
 
 ## Profiling
 If you would like to have detailed profiles of the cython routines, please make sure to set the following envinroment variable:
-```
-#!bash
+```bash
 export CYTHON_PROFILE=True
 ```
 before installing [Dedalus](http://dedalus-project.org/).
 
 Detailed profiling requires installation of the `gprof2dot` library:
-```
-#!bash
+```bash
 pip install gprof2dot
 ```
 and the availability of `dot` in the compute environment.
 
 Profiling during runs is controlled in `dedalus.cfg` or at the script level.  When enabled, code profiles are stored by default in the `./profiles` directory.  You can obtain detailed performance data aggregated across cores and on a per-core basis using:
-```
-#!bash
+```bash
 python3 plot_profiles.py
 ```
 which will produce a variety of graphical outputs, stored in `./profiles` as `.png` files.
