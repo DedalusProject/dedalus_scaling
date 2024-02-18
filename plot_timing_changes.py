@@ -13,6 +13,8 @@ Options:
 
     --label=<label>        Optional label to add to output figures
 
+    --subtimings           Produce subtiming outputs
+
     --verbose              Display text verbose output to screen
 
 """
@@ -26,6 +28,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 cmap = mpl.colormaps['tab10']
+cmap_sub = mpl.colormaps['tab20c']
 debug = False
 
 
@@ -164,10 +167,10 @@ if __name__ == "__main__":
         N_profiles = np.inf
 
     mean_time = {}
+    mean_sub_time = {}
     n_cores = []
     total_times = []
 
-    first_pass = True
     for directory in args['<directory>']:
         if verbose:
             print(f'opening {directory:s}')
@@ -180,20 +183,34 @@ if __name__ == "__main__":
         total_time=0
         n_cores.append(N_cores)
         for key in timings:
-            if first_pass:
+            if key not in mean_time:
                 mean_time[key]=[]
             mean_time[key].append(timings[key]['mean'])
             total_time += timings[key]['mean']
+            if key not in mean_sub_time:
+                mean_sub_time[key]={}
+            for sub_key in subtimings[key]:
+                if sub_key not in mean_sub_time[key]:
+                    mean_sub_time[key][sub_key] = []
+                mean_sub_time[key][sub_key].append(subtimings[key][sub_key]['mean'])
         total_times.append(total_time)
-        first_pass = False
 
     i_sort = np.argsort(np.array(n_cores))
 
     n_cores = np.array(n_cores)[i_sort]
     total_times = np.array(total_times)[i_sort]
+    N_cases = i_sort.size
     for key in mean_time:
         mean_time[key] = np.array(mean_time[key])[i_sort]
-
+    for key in mean_sub_time:
+        short_keys = []
+        for sub_key in mean_sub_time[key]:
+            if len(mean_sub_time[key][sub_key]) == N_cases:
+                mean_sub_time[key][sub_key] = np.array(mean_sub_time[key][sub_key])[i_sort]
+            else:
+                short_keys.append(sub_key)
+        for sub_key in short_keys:
+            mean_sub_time[key].pop(sub_key, None)
     fig, ax = plt.subplots()
     previous_data = np.zeros(len(n_cores))
     for i, key in enumerate(mean_time):
@@ -223,3 +240,24 @@ if __name__ == "__main__":
     ax.legend(loc='center right', fontsize='small', framealpha=0.7)
     fig.tight_layout()
     fig.savefig(f'percent_group_time{label:s}.png', dpi=300)
+
+    print(total_times)
+    if args['--subtimings']:
+        for key in subtimings:
+            fig, ax = plt.subplots()
+            previous_data = np.zeros(len(n_cores))
+            print(key, mean_time[key]/total_times)
+            for i, sub_key in enumerate(mean_sub_time[key]):
+                data = mean_sub_time[key][sub_key]/total_times
+                print(sub_key, data)
+                ax.fill_between(n_cores, data+previous_data, y2=previous_data, label=sub_key, color=cmap_sub(i),step='mid')
+                previous_data += data
+            ax.set_xscale('log', base=2)
+            ax.set_ylim(0,np.max(previous_data))
+            ax.set_xlim(np.min(n_cores),np.max(n_cores))
+            ax.set_xlabel('N cores')
+            ax.set_ylabel(f'{key:s} %time')
+            ax.legend(loc='center right', fontsize='small', framealpha=0.7)
+            fig.tight_layout()
+            key_label = key.replace(' ','_')
+            fig.savefig(f'percent_subgroup_{key_label:s}_time{label:s}.png', dpi=300)
