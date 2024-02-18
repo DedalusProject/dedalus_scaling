@@ -35,3 +35,15 @@ Profiling during runs is controlled in `dedalus.cfg` or at the script level.  Wh
 python3 plot_profiles.py
 ```
 which will produce a variety of graphical outputs, stored in `./profiles` as `.png` files.
+
+## Standard profiling
+To run a standard set of scaling and profiling tests for the `shear_flow_3d.py` triply-periodic problem on 64 to 1024 cores, run the following:
+```
+bash scale_shear_flow.sh 128 > scaling_shear_flow_3d_128x128x128.txt
+bash scale_shear_flow.sh 256 > scaling_shear_flow_3d_256x256x256.txt
+
+python3 plot_scaling.py scaling_shear_flow_3d_128x128x128.txt scaling_shear_flow_3d_256x256x256.txt
+
+python3 plot_timing_changes.py shear_flow_3d_256x256x256_* --label='256x256x256'
+python3 plot_timing_changes.py shear_flow_3d_128x128x128_* --label='128x128x128'
+```
