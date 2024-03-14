@@ -98,7 +98,7 @@ def plot_per_core_performance(stats_pdf_dict,
     fig_group = plt.figure(figsize=[8,8/2])
     ax_group = fig_group.add_subplot(1,1,1)
 
-    group = {'linear algebra':["gssv", "apply_sparse", "superlu"],
+    group = {'linear algebra':["gssv", "apply_sparse", "superlu", "linalg"],
                   'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose", "fftw_RL_to_CL", "fftw_CL_to_RL", "localize_columns", "localize_rows", "RL_fftw", "CL_fftw"],
                   'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
                   'arithmetic':["(operate)", "einsum", "arithmetic"],
@@ -134,8 +134,8 @@ def plot_per_core_performance(stats_pdf_dict,
     if verbose:
         for func in group_data['exclude']:
             print(f"found excluded call: {func[2]}, popping...")
-    excluded = group_data.pop('exclude', None)
-    if verbose: print(excluded)
+    #excluded = group_data.pop('exclude', None)
+    #if verbose: print(excluded)
 
     routine_text = "top {:d} routines for {:s}".format(N_profiles, label)
     if verbose:
