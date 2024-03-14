@@ -47,8 +47,8 @@ def clean_display(ax):
     ax.yaxis.set_ticks_position('none')
     ax.xaxis.set_ticks_position('none')
 
-group = {'linear algebra':["gssv", "apply_sparse", "superlu", "linalg"],
-              'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose", "fftw_RL_to_CL", "fftw_CL_to_RL", "localize_columns", "localize_rows", "RL_fftw", "CL_fftw"],
+group = {'linear algebra':["gssv", "apply_sparse", "superlu", "linalg", "solve"],
+              'MPI':["mpi4py.MPI", "fftw.fftw_wrappers.Transpose", "fftw_RL_to_CL", "fftw_CL_to_RL", "localize_columns", "localize_rows", "RL_fftw", "CL_fftw", "transposes.pyx"],
               'FFT':["ifft", "_dct", "rfft", "unpack_rescale", 'repack_rescale', "forward", "backward"],
               'arithmetic':["operate", "einsum", "arithmetic"],
               'copy':["copyto", "gather_inputs", "gather_outputs", 'scatter_inputs', "scatter_outputs"],
@@ -236,8 +236,8 @@ if __name__ == "__main__":
     ax.set_ylim(0,1)
     ax.set_xlim(np.min(n_cores),np.max(n_cores))
     ax.set_xlabel('N cores')
-    ax.set_ylabel('%time')
-    ax.legend(loc='center right', fontsize='small', framealpha=0.7)
+    ax.set_ylabel('fraction of time')
+    ax.legend(loc='center right', fontsize='small', framealpha=0.5)
     fig.tight_layout()
     fig.savefig(f'percent_group_time{label:s}.png', dpi=300)
 
@@ -256,8 +256,12 @@ if __name__ == "__main__":
             ax.set_ylim(0,np.max(previous_data))
             ax.set_xlim(np.min(n_cores),np.max(n_cores))
             ax.set_xlabel('N cores')
-            ax.set_ylabel(f'{key:s} %time')
-            ax.legend(loc='center right', fontsize='small', framealpha=0.7)
+            ax.set_ylabel(f'{key:s} fraction of time')
+            leg = ax.legend(fontsize='x-small', framealpha=0.3)
+            leg_entries = len(leg.legend_handles)
+            if leg_entries > 12:
+                leg = ax.legend(fontsize='xx-small', ncols=2, framealpha=0.3)
+
             fig.tight_layout()
             key_label = key.replace(' ','_')
             fig.savefig(f'percent_subgroup_{key_label:s}_time{label:s}.png', dpi=300)
